@@ -2,7 +2,7 @@ import time
 from rpi_ws281x import PixelStrip, Color
 
 # LED 配置
-LED_COUNT = 30         # 灯珠数量，根据你的实际灯带长度修改
+LED_COUNT = 60         # 灯珠数量，根据你的实际灯带长度修改
 LED_PIN = 18           # GPIO18 (物理引脚12)
 LED_FREQ_HZ = 800000   # LED信号频率（一般800kHz）
 LED_DMA = 10           # DMA通道
