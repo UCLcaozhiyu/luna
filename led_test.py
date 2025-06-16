@@ -32,11 +32,20 @@ strip = PixelStrip(LED_COUNT, LED_PIN, LED_FREQ_HZ, LED_DMA, LED_INVERT, LED_BRI
 strip.begin()
 
 def generate_random_color():
-    """生成随机颜色"""
-    r = random.randint(0, 255)
-    g = random.randint(0, 255)
-    b = random.randint(0, 255)
-    return Color(r, g, b)
+    """生成随机颜色，避免浅色和难以区分的颜色"""
+    # 预定义一些饱和度高的颜色
+    predefined_colors = [
+        Color(255, 0, 128),    # 粉红
+        Color(128, 0, 255),    # 紫色
+        Color(0, 128, 255),    # 天蓝
+        Color(255, 128, 0),    # 橙色
+        Color(128, 255, 0),    # 黄绿
+        Color(255, 0, 255),    # 洋红
+        Color(0, 255, 128),    # 青绿
+    ]
+    
+    # 随机选择一个预定义颜色
+    return random.choice(predefined_colors)
 
 def light_zone(zone, color, duration=1.2):
     """点亮指定区域"""
@@ -110,6 +119,18 @@ def get_level_config(level):
     
     return config
 
+def show_level_transition(level):
+    """显示关卡过渡动画"""
+    print(f"\n=== 第 {level} 关 ===")
+    # 所有灯闪烁三次
+    for _ in range(3):
+        for zone in ZONES.keys():
+            light_zone(zone, Color(255, 255, 255), 0.2)  # 白色
+        for zone in ZONES.keys():
+            turn_off_zone(zone)
+        time.sleep(0.3)
+    time.sleep(1)  # 额外等待1秒
+
 def play_game():
     """开始游戏"""
     print("进阶版 Simon LED Game - 按Ctrl+C退出")
@@ -117,7 +138,7 @@ def play_game():
     
     try:
         while True:
-            print(f"\n=== 第 {level} 关 ===")
+            show_level_transition(level)
             config = get_level_config(level)
             
             # 生成随机序列
@@ -128,8 +149,8 @@ def play_game():
             show_sequence(sequence, config['duration'])
             
             # 等待一段时间后进入下一关
-            print("进入下一关...")
-            time.sleep(2)
+            print("准备进入下一关...")
+            time.sleep(3)  # 增加关卡间隔时间
             level += 1
             
     except KeyboardInterrupt:
