@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Together We Glow</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/buttons.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/single.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/modal.css') }}">
+</head>
+<body>
+    <div class="game-container">
+        <div class="user-info">
+            <div class="user-input-container">
+                <input type="text" id="username-input" placeholder="input player name" maxlength="12">
+                <button id="save-username-btn">save</button>
+            </div>
+            <div id="username-display">
+                <span>player: </span>
+                <span id="username-text">tourist</span>
+            </div>
+        </div>
+
+        <h1>Together We Glow</h1>
+
+        <div class="stats-container">
+            <div class="stat-box">
+                <div class="stat-label">level</div>
+                <div id="level-value" class="stat-value">1</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">score</div>
+                <div id="score-value" class="stat-value">0</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">length</div>
+                <div id="sequence-length" class="stat-value">3</div>
+            </div>
+        </div>
+
+        <div class="message-box" id="message-box">
+            Click the 'Start Game' button to start the challenge!
+        </div>
+
+        <div class="game-board">
+            <div class="color-btn" id="red-btn">
+                <span class="btn-label">red</span>
+            </div>
+            <div class="color-btn" id="blue-btn">
+                <span class="btn-label">blue</span>
+            </div>
+            <div class="color-btn" id="green-btn">
+                <span class="btn-label">green</span>
+            </div>
+            <div class="color-btn" id="yellow-btn">
+                <span class="btn-label">yellow</span>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button id="start-btn" class="btn">start</button>
+            <button id="reset-btn" class="btn">reset</button>
+        </div>
+
+        <div id="game-over-modal" class="modal-overlay">
+            <div class="modal-content">
+                <h2>game over</h2>
+                <p><strong>player:</strong> <span id="modal-username">tourist</span></p>
+                <p><strong>score:</strong> <span id="modal-score">0</span></p>
+                <p id="modal-message" style="font-style: italic; color: #7f8c8d;"></p>
+                <div>
+                    <button id="play-again-btn">Play Again</button>
+                    <button id="return-home-btn">Return to Home</button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        const socket = io(); // 连接到后端的 WebSocket 服务器
+
+        // 鼓励语池
+        const encouragementMessages = [
+            "That is great! You have made a lot of progress!",
+            "Try again, you will definitely break through yourself!",
+            "Every failure is a step towards success!",
+            "Keep up the good work, victory is ahead!",
+            "Perseverance prevails!"
+        ];
+
+        const playerNameFromServer = "{{ player_name }}";  // 从Flask模板传入
+        const gameModeFromServer = "{{ game_mode }}";      // 从Flask模板传入
+
+        // 如果有服务端传来的名字，则更新显示
+        if (playerNameFromServer) {
+            document.getElementById('username-text').textContent = playerNameFromServer;
+            document.getElementById('username-display').style.display = 'flex';
+            document.querySelector('.user-input-container').style.display = 'none';
+        }
+
+        // 游戏状态管理
+        const gameState = {
+            level: 1,
+            score: 0,
+            targetSequence: [],
+            playerSequence: [],
+            isPlaying: false,
+            waitingForInput: false
+        };
+
+        // -------------------------- WebSocket 事件监听 -----------------------------
+
+        socket.on('connect', () => {
+            console.log("socket[connect]receive::Connected with sid", socket.id);
+            // console.log("Connected with sid:", socket.id);
+            // 将 sid 发送到后端绑定 username
+            //socket.emit('register_user', { username: currentUsername, sid: socket.id });
+            //joinRoom(); // 自动加入房间
+        });
+
+        socket.on('disconnect', () => {
+            console.log("socket[disconnect]receive:Disconnected from server");
+            // 可以添加一些UI提示，例如显示“已断开连接”
+        });
+
+        // 监听“禁止加入”事件
+        socket.on('join_denied', (data) => {
+            alert(data.message || "Unable to join room");
+            // 跳转回模式选择页
+            setTimeout(() => {
+                window.location.href = '/mode_selection';
+            }, 200);
+        });
+
+        // DOM元素
+        const levelValue = document.getElementById('level-value');
+        const scoreValue = document.getElementById('score-value');
+        const sequenceLength = document.getElementById('sequence-length');
+        const messageBox = document.getElementById('message-box');
+        const startBtn = document.getElementById('start-btn');
+        const resetBtn = document.getElementById('reset-btn');
+        const colorButtons = {
+            red: document.getElementById('red-btn'),
+            blue: document.getElementById('blue-btn'),
+            green: document.getElementById('green-btn'),
+            yellow: document.getElementById('yellow-btn')
+        };
+
+        // 初始化游戏
+        function initGame() {
+            gameState.level = 1;
+            gameState.score = 0;
+            gameState.targetSequence = [];
+            gameState.playerSequence = [];
+            gameState.isPlaying = false;
+            gameState.waitingForInput = false;
+
+            updateUI();
+            // The sequence-display div is commented out in HTML, so no need to clear it.
+            // clearSequenceDisplay();
+            messageBox.textContent = "Click the 'start' button to start the challenge!";
+            messageBox.classList.remove('game-over');
+        }
+
+        // 更新UI显示
+        function updateUI() {
+            levelValue.textContent = gameState.level;
+            scoreValue.textContent = gameState.score;
+            sequenceLength.textContent = gameState.targetSequence.length;
+
+            // 控制按钮状态
+            Object.values(colorButtons).forEach(btn => {
+                btn.classList.toggle('disabled', !gameState.waitingForInput);
+            });
+        }
+
+        // 高亮按钮
+        function highlightButton(color) {
+            const btn = colorButtons[color];
+            if (!btn) return;
+
+            btn.classList.add('active');
+            setTimeout(() => {
+                btn.classList.remove('active');
+            }, 300);
+        }
+
+        // 开始游戏
+        startBtn.addEventListener('click', async () => {
+            if (gameState.isPlaying) return;
+
+            try {
+                messageBox.textContent = `Observe the light!`;
+                // 发送开始请求
+                const response = await fetch('/api/game/start', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        playerName: 'Player1'
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.status === 'started') {
+                    gameState.isPlaying = true;
+                    gameState.level = data.level;
+                    gameState.targetSequence = data.sequence;
+
+                     // 等待后端通过WebSocket通知树莓派完成序列显示
+                    new Promise((resolve) => {
+                        const checkForReadyInput = (data) => {
+                            if (data.status === 'ready_for_input') {
+                                socket.off('game_update'); // 移除监听器
+                                resolve();
+                            }
+                        };
+
+                        socket.on('game_update', checkForReadyInput);
+                    }).then(() => {
+                        console.log('1树莓派已完成序列显示,请玩家开始输入');
+                        gameState.waitingForInput = true;
+                        updateUI();
+                        messageBox.textContent = `请按顺序点击颜色按钮（序列长度: ${gameState.targetSequence.length})`;
+                    });
+                }
+            } catch (error) {
+                console.error('开始游戏失败:', error);
+                messageBox.textContent = "game start failed,please try again later.";
+            }
+        });
+
+        // 颜色按钮点击处理
+        Object.entries(colorButtons).forEach(([color, btn]) => {
+            btn.addEventListener('click', () => {
+                if (!gameState.waitingForInput || !gameState.isPlaying) return;
+
+                highlightButton(color);
+                // 添加玩家输入到玩家输入序列
+                gameState.playerSequence.push(color);
+
+                // 检查是否完成输入
+                if (gameState.playerSequence.length === gameState.targetSequence.length) {
+                    checkPlayerSequence();
+                }
+            });
+        });
+
+        // 验证玩家序列
+        async function checkPlayerSequence() {
+            gameState.waitingForInput = false;
+            updateUI();
+
+            try {
+                const response = await fetch('/api/game/check', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        level: gameState.level,
+                        playerSequence: gameState.playerSequence,
+                        targetSequence: gameState.targetSequence
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.result === 'correct') {
+                    // 达到最大关卡
+                     if (gameState.level >= 10) {
+                        gameState.isPlaying = false;
+                        messageBox.textContent = `Congradulation! Your score is:${gameState.score}`;
+                        showGameOverModal(gameState.score); // 显示弹窗
+                        return;
+                    }
+
+                    // 正确进入下一关
+                    gameState.score = result.score;
+                    gameState.level = result.nextLevel;
+                    gameState.playerSequence = [];
+
+                    messageBox.textContent = `Next turn!Observe the light!`;
+
+                    // 延迟后生成新序列
+                    setTimeout(async () => {
+                        const seqResponse = await fetch(`/api/game/sequence?level=${gameState.level}`);
+                        const seqData = await seqResponse.json();
+
+                        gameState.targetSequence = seqData.sequence;
+                        // messageBox.textContent = `第${gameState.level}关准备中...`;
+
+                        // 等待后端通过WebSocket通知树莓派完成序列显示
+                        new Promise((resolve) => {
+                            const checkForReadyInput = (data) => {
+                                if (data.status === 'ready_for_input') {
+                                    socket.off('game_update'); // 移除监听器
+                                    resolve();
+                                }
+                            };
+
+                            socket.on('game_update', checkForReadyInput);
+                        }).then(() => {
+                            console.log('2树莓派已完成序列显示,请玩家开始输入');
+                            gameState.waitingForInput = true;
+                            updateUI();
+                            messageBox.textContent = `请按顺序点击颜色按钮（序列长度: ${gameState.targetSequence.length})`;
+                        });
+                    }, 500);
+
+                } else {
+                    // 错误结束游戏
+                    gameState.isPlaying = false;
+                    messageBox.textContent = `Game Over! Your Score: ${gameState.score} Reached level: ${gameState.level}`;
+                    messageBox.classList.add('game-over');
+                    showGameOverModal(gameState.score); // 显示弹窗
+                }
+
+                updateUI();
+            } catch (error) {
+                console.error('验证序列失败:', error);
+                messageBox.textContent = "Verification failed, please try again!";
+            }
+        }
+
+        // 重新开始游戏
+        resetBtn.addEventListener('click', () => {
+            fetch('/api/game/reset', { method: 'POST' })
+                .then(() => initGame())
+                .catch(error => {
+                    console.error('重置游戏失败:', error);
+                    messageBox.textContent = "Reset failed, please try again!";
+                });
+        });
+
+        // 初始化游戏
+        initGame();
+
+        // 显示弹窗函数
+        function showGameOverModal(finalScore) {
+            const modal = document.getElementById('game-over-modal');
+            const usernameDisplay = document.getElementById('modal-username');
+            const scoreDisplay = document.getElementById('modal-score');
+            const messageDisplay = document.getElementById('modal-message');
+
+            // 设置信息
+            usernameDisplay.textContent = playerNameFromServer || 'tourist';
+            scoreDisplay.textContent = finalScore;
+
+            // 随机鼓励语
+            const randomMsg = encouragementMessages[
+                Math.floor(Math.random() * encouragementMessages.length)
+            ];
+            messageDisplay.textContent = randomMsg;
+
+            // 显示弹窗
+            modal.style.display = 'flex';
+
+            // 绑定按钮点击事件（只绑定一次即可）
+            document.getElementById('play-again-btn').onclick = () => {
+                modal.style.display = 'none';
+                initGame();
+                // If you want to automatically start a new game after "Play Again", uncomment the line below.
+                // start_game();
+            };
+
+            // 按钮点击事件：返回主页
+            document.getElementById('return-home-btn').onclick = () => {
+                window.location.href = '/mode_selection';
+            };
+        }
+    </script>
+</body>
+</html>

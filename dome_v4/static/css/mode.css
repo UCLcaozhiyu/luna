@@ -1,0 +1,69 @@
+body {
+    font-family: Arial, sans-serif;
+    /* 使用三色渐变背景（蓝 → 红 → 黄），视觉上更吸引人、有动感 */
+    /*background: linear-gradient(135deg, #1a2a6c, #b21f1f, #fdbb2d);*/
+    background: linear-gradient(135deg, #ff6ec4, #ff97c6); /* 粉色渐变 */
+    /* 将整个页面内容水平和垂直居中显示 */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    margin: 0;
+}
+
+.container {
+    background-color: rgba(255, 255, 255, 0.95);  /* 纯白色背景，半透明（95%） */
+    padding: 40px;
+    border-radius: 15px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    width: 100%;
+    max-width: 800px;  /* 最大宽度 */
+    text-align: center;     /* 文本居中 */
+}
+
+h1 {
+    color: #2c3e50;     /*深蓝*/
+    margin-bottom: 25px;
+    font-size: 5rem;    /*手机上显示合适的字体*/
+}
+
+input[type="text"] {
+    width: 100%;
+    padding: 12px;
+    margin-bottom: 20px;
+    border: 4px solid #ccc; /* 浅灰色边框，明确输入区域 */
+    border-radius: 15px; /* 圆角输入框 */
+    font-size: 3rem;    /*手机上显示合适的字体*/
+}
+
+label {
+    display: block;
+    margin-bottom: 10px;
+    font-size: 3rem;    /*手机上显示合适的字体*/
+    color: #333;
+}
+
+select, button {
+    width: 100%;
+    padding: 12px;
+    font-size: 3rem;        /*手机上显示合适的字体*/
+    margin-top: 20px;
+    border-radius: 15px;     /* 圆角输入框 */
+    border: none;
+    cursor: pointer;
+}
+
+button {
+    background-color: #3498db;
+    color: white;
+    transition: background-color 0.3s ease;
+}
+
+button:hover {
+    background-color: #2980b9;
+}
+
+.error-message {
+    color: red;
+    margin-top: 10px;
+}

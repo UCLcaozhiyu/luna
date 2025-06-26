@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>选择游戏模式</title>
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/buttons.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/layout.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/mode.css') }}">
+</head>
+<body>
+
+    <div class="container">
+        <h1>Together We Glow</h1>
+        <form id="mode-form">
+            <label for="username-input">input your name:</label>
+            <input type="text" id="username-input" name="username">
+
+            <label for="mode-select">select mode:</label>
+            <select id="mode-select" name="mode">
+                <option value="single">Single player</option>
+                <option value="multi"> Multi Player</option>
+            </select>
+
+            <button type="submit" class="btn primary">Begin</button>
+            <div class="error-message" id="error-message"></div>
+        </form>
+    </div>
+
+<script>
+    document.getElementById('mode-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+
+        const username = document.getElementById('username-input').value.trim();
+        const mode = document.getElementById('mode-select').value;
+
+        fetch('/api/save_username', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username })
+        })
+        .then(res => res.json())
+        .then(() => {
+            return fetch('/api/select_mode', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ mode })
+            });
+        })
+        .then(res => res.json())
+        .then(data => {
+            window.location.href = data.redirect;
+        });
+    });
+</script>
+
+</body>
+</html>
