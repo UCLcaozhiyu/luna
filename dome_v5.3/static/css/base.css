@@ -1,0 +1,34 @@
+/* static/css/base.css */
+
+
+body {
+    /*设置全局字体，使用圆润、易读的无衬线字体，提升界面亲和力*/
+    font-family: 'Arial Rounded MT Bold', 'Segoe UI', sans-serif;
+    line-height: 1.6;/*设置文字行高，使段落阅读更舒适（1.6 倍）*/
+    color: #333;/*设置默认文字颜色为深灰色（#333），视觉上比纯黑柔和*/
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box; /* Ensure consistent box model */
+}
+
+/* Basic resets */
+h1, h2, h3, h4, h5, h6, p, ul, ol, li {
+    margin: 0;
+    padding: 0;
+}
+
+ul {
+    list-style: none; /* 移除 <ul> 列表的默认项目符号（如圆点） */
+}
+
+a {
+    text-decoration: none; /* 移除链接下划线，保持整体 UI 简洁 */
+    color: inherit; /* 让链接继承父容器的文字颜色，避免突兀的蓝色链接 */
+}
+
+/* Common container styling */
+.container {
+    padding: 20px;
+    margin: 0 auto;
+    max-width: 1200px; /* Max width for content */
+}
