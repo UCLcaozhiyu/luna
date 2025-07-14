@@ -1,0 +1,73 @@
+/* buttons.css - Common button styles */
+.btn {
+    display: inline-block;
+    padding: 20px 30px; /*手机显示合适*/
+    font-size: 3rem;    /*手机上显示合适的字体：3rem*/
+    font-weight: bold;  /* 加粗文字，增强按钮的可识别性 */
+    text-align: center; /* 文字居中显示 */
+    text-decoration: none;
+    border: none;
+    border-radius: 20px; /* 圆角矩形按钮，手机显示合适*/
+    cursor: pointer;    /* 鼠标悬停时变为手型，提示用户该元素可点击 */
+    transition: background-color 0.3s ease, transform 0.2s ease, box-shadow 0.3s ease;  /*添加颜色、阴影、位移等过渡动画，使交互更自然*/
+    -webkit-appearance: none; /* 禁用浏览器默认样式（如 Mac 上的 Aqua 按钮样式），保证跨平台一致性 */
+    -moz-appearance: none;
+    appearance: none;
+}
+
+/* Primary button style (e.g., Start, Save) */
+.btn.primary {
+    background: linear-gradient(to right, #4A90E2, #5DADE2); /* 使用从左到右的蓝色渐变背景 */
+    color: white;       /* 白色文字 */
+    box-shadow: 0 4px 10px rgba(74, 144, 226, 0.3); /* 添加柔和阴影，增强立体感和点击反馈感 */
+}
+
+.btn.primary:hover {
+    transform: translateY(-2px);        /* 悬停时按钮轻微上移，模拟“浮起”效果 */
+    box-shadow: 0 6px 15px rgba(74, 144, 226, 0.4);     /* 悬停时阴影加深放大，增强互动反馈 */
+}
+
+.btn.primary:active {
+    transform: translateY(1px);     /* 按钮按下时略微下沉，模仿真实按钮点击感 */
+}
+
+/* Success button style (e.g., Ready, Play Again) */
+.btn.success {
+    background: linear-gradient(to right, #2ecc71, #27ae60); /* Green gradient */
+    color: white;
+    box-shadow: 0 4px 10px rgba(46, 204, 113, 0.3);
+}
+
+.btn.success:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 15px rgba(46, 204, 113, 0.4);
+}
+
+.btn.success:active {
+    background-color: #27ae60;
+    transform: translateY(1px);
+}
+
+/* Danger button style (e.g., Reset) */
+.btn.danger {
+    background: linear-gradient(to right, #e74c3c, #c0392b); /* Red gradient */
+    color: white;
+    box-shadow: 0 4px 10px rgba(231, 76, 60, 0.3);
+}
+
+.btn.danger:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 15px rgba(231, 76, 60, 0.4);
+}
+
+.btn.danger:active {
+    transform: translateY(1px);
+}
+
+/* Disabled button state */
+.btn:disabled, .btn.disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    box-shadow: none;
+    transform: none;
+}
