@@ -46,6 +46,7 @@ soft_colors = [
 # ========== 邀请检测状态 ==========
 invite_detection_active = True
 game_started = False
+invite_thread = None  # 存储邀请检测线程的引用
 
 # ========== 距离检测函数 ==========
 def get_distance():
@@ -100,10 +101,20 @@ def soft_breathing_once(step_delay=0.008):
     
     color = random.choice(soft_colors)
     for b in range(0, 256, 8):  # 渐亮
+        # 检查是否应该停止动画
+        if not invite_detection_active or game_started:
+            print("🛑 动画被中断")
+            return
         apply_brightness(color, b)
         time.sleep(step_delay)
+    
     time.sleep(0.1)
+    
     for b in range(255, -1, -8):  # 渐灭
+        # 检查是否应该停止动画
+        if not invite_detection_active or game_started:
+            print("🛑 动画被中断")
+            return
         apply_brightness(color, b)
         time.sleep(step_delay)
 
@@ -133,6 +144,10 @@ def invite_detection_thread():
 
     while invite_detection_active and not game_started:
         try:
+            # 检查是否应该停止
+            if not invite_detection_active or game_started:
+                break
+                
             dist = get_distance()
             if IS_RPI_ENV:
                 print(f"🔍 当前距离：{dist} cm")
@@ -140,11 +155,17 @@ def invite_detection_thread():
             if dist and dist <= trigger_distance:
                 if not detected:
                     print("✅ 检测到人员靠近，开始播放邀请动画")
+                    # 在播放动画前再次检查是否应该停止
+                    if not invite_detection_active or game_started:
+                        break
                     soft_breathing_once()
                     last_play_time = time.time()
                     detected = True
                 elif time.time() - last_play_time >= animation_interval:
                     print("🔁 持续检测到人员，循环播放邀请动画")
+                    # 在播放动画前再次检查是否应该停止
+                    if not invite_detection_active or game_started:
+                        break
                     soft_breathing_once()
                     last_play_time = time.time()
             else:
@@ -164,7 +185,7 @@ def invite_detection_thread():
 # ========== 启动邀请检测 ==========
 def start_invite_detection():
     """启动邀请检测后台线程"""
-    global invite_detection_active, game_started
+    global invite_detection_active, game_started, invite_thread
     invite_detection_active = True
     game_started = False
     invite_thread = threading.Thread(target=invite_detection_thread, daemon=True)
@@ -174,10 +195,23 @@ def start_invite_detection():
 # ========== 停止邀请检测 ==========
 def stop_invite_detection():
     """停止邀请检测"""
-    global invite_detection_active, game_started
+    global invite_detection_active, game_started, invite_thread
+    
+    print("🛑 正在停止邀请检测...")
     invite_detection_active = False
     game_started = True
+    
+    # 立即清空LED灯带，停止动画
     clear_invite_strip()
+    
+    # 等待线程结束（最多等待1秒）
+    if invite_thread and invite_thread.is_alive():
+        invite_thread.join(timeout=1.0)
+        if invite_thread.is_alive():
+            print("⚠️ 邀请检测线程未能在1秒内停止，但已设置停止标志")
+        else:
+            print("✅ 邀请检测线程已成功停止")
+    
     print("⏹️ 邀请检测已停止")
 
 
