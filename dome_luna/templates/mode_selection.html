@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>选择游戏模式</title>
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/buttons.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/layout.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/mode.css') }}">
+    <style>
+        /* 添加动画和优化样式 */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.05);
+            }
+        }
+
+        @keyframes gradientShift {
+            0% {
+                background-position: 0% 50%;
+            }
+            50% {
+                background-position: 100% 50%;
+            }
+            100% {
+                background-position: 0% 50%;
+            }
+        }
+
+        @keyframes float {
+            0%, 100% {
+                transform: translateY(0px);
+            }
+            50% {
+                transform: translateY(-10px);
+            }
+        }
+
+        body {
+            background: linear-gradient(-45deg, #ff6ec4, #ff97c6, #ffb3d9, #ffd1dc);
+            background-size: 400% 400%;
+            animation: gradientShift 15s ease infinite;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 0;
+            font-family: 'Arial Rounded MT Bold', 'Segoe UI', sans-serif;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 50px 40px;
+            border-radius: 25px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 500px;
+            text-align: center;
+            animation: fadeInUp 0.8s ease-out;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 40px;
+            font-size: 3.5rem;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+            animation: float 3s ease-in-out infinite;
+            background: linear-gradient(45deg, #ff6ec4, #7366ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+            animation: fadeInUp 0.8s ease-out 0.2s both;
+        }
+
+        .form-group:nth-child(2) {
+            animation-delay: 0.4s;
+        }
+
+        .form-group:nth-child(3) {
+            animation-delay: 0.6s;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 12px;
+            font-size: 1.8rem;
+            color: #34495e;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 18px 20px;
+            border: 3px solid #e8e8e8;
+            border-radius: 15px;
+            font-size: 1.6rem;
+            transition: all 0.3s ease;
+            background: rgba(255, 255, 255, 0.9);
+            box-sizing: border-box;
+        }
+
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #ff6ec4;
+            box-shadow: 0 0 20px rgba(255, 110, 196, 0.3);
+            transform: translateY(-2px);
+        }
+
+        select {
+            width: 100%;
+            padding: 18px 20px;
+            font-size: 1.6rem;
+            border: 3px solid #e8e8e8;
+            border-radius: 15px;
+            background: rgba(255, 255, 255, 0.9);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            appearance: none;
+            background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6,9 12,15 18,9'%3e%3c/polyline%3e%3c/svg%3e");
+            background-repeat: no-repeat;
+            background-position: right 15px center;
+            background-size: 20px;
+        }
+
+        select:focus {
+            outline: none;
+            border-color: #ff6ec4;
+            box-shadow: 0 0 20px rgba(255, 110, 196, 0.3);
+            transform: translateY(-2px);
+        }
+
+        .btn {
+            width: 100%;
+            padding: 20px;
+            font-size: 1.8rem;
+            font-weight: bold;
+            border: none;
+            border-radius: 15px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            position: relative;
+            overflow: hidden;
+            background: linear-gradient(45deg, #ff6ec4, #7366ff);
+            color: white;
+            box-shadow: 0 8px 25px rgba(255, 110, 196, 0.3);
+        }
+
+        .btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 35px rgba(255, 110, 196, 0.4);
+            animation: pulse 1s infinite;
+        }
+
+        .btn:active {
+            transform: translateY(-1px);
+        }
+
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.5s;
+        }
+
+        .btn:hover::before {
+            left: 100%;
+        }
+
+        .error-message {
+            color: #e74c3c;
+            margin-top: 15px;
+            font-size: 1.4rem;
+            font-weight: 500;
+            padding: 10px;
+            border-radius: 8px;
+            background: rgba(231, 76, 60, 0.1);
+            border: 1px solid rgba(231, 76, 60, 0.2);
+            animation: fadeInUp 0.5s ease-out;
+        }
+
+        .loading {
+            display: none;
+            margin-top: 20px;
+        }
+
+        .loading::after {
+            content: '';
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #ff6ec4;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            .container {
+                margin: 20px;
+                padding: 30px 20px;
+            }
+            
+            h1 {
+                font-size: 2.8rem;
+            }
+            
+            label {
+                font-size: 1.5rem;
+            }
+            
+            input[type="text"], select, .btn {
+                font-size: 1.4rem;
+                padding: 15px;
+            }
+        }
+
+        /* 添加一些装饰元素 */
+        .decoration {
+            position: absolute;
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            background: linear-gradient(45deg, rgba(255, 110, 196, 0.1), rgba(115, 102, 255, 0.1));
+            animation: float 6s ease-in-out infinite;
+        }
+
+        .decoration:nth-child(1) {
+            top: 10%;
+            left: 10%;
+            animation-delay: 0s;
+        }
+
+        .decoration:nth-child(2) {
+            top: 20%;
+            right: 15%;
+            animation-delay: 2s;
+        }
+
+        .decoration:nth-child(3) {
+            bottom: 15%;
+            left: 20%;
+            animation-delay: 4s;
+        }
+    </style>
+</head>
+<body>
+    <!-- 装饰元素 -->
+    <div class="decoration"></div>
+    <div class="decoration"></div>
+    <div class="decoration"></div>
+
+    <div class="container">
+        <h1>Together We Glow</h1>
+        <form id="mode-form">
+            <div class="form-group">
+                <label for="username-input">Enter your username</label>
+                <input type="text" id="username-input" name="username" placeholder="Type your name here..." autocomplete="off">
+            </div>
+
+            <div class="form-group">
+                <label for="mode-select">Select a game mode</label>
+                <select id="mode-select" name="mode">
+                    <option value="single">🎮 Single-player Mode</option>
+                    <option value="multi">👥 Multiplayer Mode</option>
+                </select>
+            </div>
+
+            <button type="submit" class="btn">🚀 Start Adventure</button>
+            <div class="loading" id="loading"></div>
+            <div class="error-message" id="error-message"></div>
+        </form>
+    </div>
+
+<script>
+    // 添加输入验证和动画效果
+    const form = document.getElementById('mode-form');
+    const usernameInput = document.getElementById('username-input');
+    const modeSelect = document.getElementById('mode-select');
+    const submitBtn = document.querySelector('.btn');
+    const loading = document.getElementById('loading');
+    const errorMessage = document.getElementById('error-message');
+
+    // 输入验证
+    usernameInput.addEventListener('input', function() {
+        const value = this.value.trim();
+        if (value.length > 0) {
+            this.style.borderColor = '#27ae60';
+        } else {
+            this.style.borderColor = '#e8e8e8';
+        }
+        hideError();
+    });
+
+    // 隐藏错误信息
+    function hideError() {
+        errorMessage.style.display = 'none';
+    }
+
+    // 显示错误信息
+    function showError(message) {
+        errorMessage.textContent = message;
+        errorMessage.style.display = 'block';
+        errorMessage.style.animation = 'fadeInUp 0.5s ease-out';
+    }
+
+    // 表单提交处理
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+
+        const username = usernameInput.value.trim();
+        const mode = modeSelect.value;
+
+        // 验证用户名
+        if (!username) {
+            showError('Please enter a username');
+            usernameInput.focus();
+            return;
+        }
+
+        if (username.length < 2) {
+            showError('Username must be at least 2 characters long');
+            usernameInput.focus();
+            return;
+        }
+
+        // 显示加载状态
+        submitBtn.style.display = 'none';
+        loading.style.display = 'block';
+        hideError();
+
+        // 添加按钮点击动画
+        submitBtn.style.transform = 'scale(0.95)';
+        setTimeout(() => {
+            submitBtn.style.transform = 'scale(1)';
+        }, 150);
+
+        // 发送请求
+        fetch('/api/save_username', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username })
+        })
+        .then(res => res.json())
+        .then(() => {
+            return fetch('/api/select_mode', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ mode })
+            });
+        })
+        .then(res => res.json())
+        .then(data => {
+            // 添加页面切换动画
+            document.body.style.animation = 'fadeInUp 0.5s ease-out reverse';
+            setTimeout(() => {
+                window.location.href = data.redirect;
+            }, 300);
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showError('Connection error. Please try again.');
+            submitBtn.style.display = 'block';
+            loading.style.display = 'none';
+        });
+    });
+
+    // 添加键盘快捷键
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && document.activeElement === usernameInput) {
+            modeSelect.focus();
+        } else if (e.key === 'Enter' && document.activeElement === modeSelect) {
+            form.dispatchEvent(new Event('submit'));
+        }
+    });
+
+    // 页面加载完成后的动画
+    window.addEventListener('load', function() {
+        document.body.style.opacity = '0';
+        document.body.style.animation = 'fadeInUp 1s ease-out forwards';
+    });
+</script>  
+
+<script>
+    // 只有玩过游戏的人才弹窗
+    if (sessionStorage.getItem('has_played') && !sessionStorage.getItem("survey_shown")) {
+        setTimeout(() => {
+            const answer = confirm("Would you like to share your feedback about the game?");
+            if (answer) {
+                window.location.href = "https://tally.so/r/w7Y8V9";
+            }
+            sessionStorage.setItem("survey_shown", "true");
+        }, 3000);
+    }
+</script>
+
+    
+</body>
+</html>

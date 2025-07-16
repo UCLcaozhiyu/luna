@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Together We Glow</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/buttons.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/multi.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/modal.css') }}">
+    <style>
+        /* 多人游戏界面动画样式 */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes slideInLeft {
+            from {
+                opacity: 0;
+                transform: translateX(-50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        @keyframes slideInRight {
+            from {
+                opacity: 0;
+                transform: translateX(50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.05);
+            }
+        }
+
+        @keyframes bounce {
+            0%, 20%, 50%, 80%, 100% {
+                transform: translateY(0);
+            }
+            40% {
+                transform: translateY(-10px);
+            }
+            60% {
+                transform: translateY(-5px);
+            }
+        }
+
+        @keyframes glow {
+            0%, 100% {
+                box-shadow: 0 0 5px currentColor;
+            }
+            50% {
+                box-shadow: 0 0 20px currentColor, 0 0 30px currentColor;
+            }
+        }
+
+        @keyframes shake {
+            0%, 100% {
+                transform: translateX(0);
+            }
+            10%, 30%, 50%, 70%, 90% {
+                transform: translateX(-5px);
+            }
+            20%, 40%, 60%, 80% {
+                transform: translateX(5px);
+            }
+        }
+
+        @keyframes playerJoin {
+            0% {
+                opacity: 0;
+                transform: scale(0.5) rotate(-180deg);
+            }
+            50% {
+                transform: scale(1.2) rotate(90deg);
+            }
+            100% {
+                opacity: 1;
+                transform: scale(1) rotate(0deg);
+            }
+        }
+
+        @keyframes readyPulse {
+            0%, 100% {
+                background-color: #e74c3c;
+            }
+            50% {
+                background-color: #27ae60;
+            }
+        }
+
+        @keyframes countdown {
+            0% {
+                transform: scale(1);
+                opacity: 1;
+            }
+            50% {
+                transform: scale(1.5);
+                opacity: 0.8;
+            }
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        /* 页面加载动画 */
+        .game-container {
+            animation: fadeInUp 0.8s ease-out;
+        }
+
+        .game-container > * {
+            animation: fadeInUp 0.6s ease-out;
+        }
+
+        .game-container > *:nth-child(1) { animation-delay: 0.1s; }
+        .game-container > *:nth-child(2) { animation-delay: 0.2s; }
+        .game-container > *:nth-child(3) { animation-delay: 0.3s; }
+        .game-container > *:nth-child(4) { animation-delay: 0.4s; }
+        .game-container > *:nth-child(5) { animation-delay: 0.5s; }
+        .game-container > *:nth-child(6) { animation-delay: 0.6s; }
+
+        /* 标题动画 */
+        h1 {
+            animation: pulse 3s ease-in-out infinite;
+            text-shadow: 0 0 10px rgba(255, 110, 196, 0.5);
+        }
+
+        /* 房间信息动画 */
+        .room-info-container {
+            animation: slideInLeft 0.8s ease-out 0.2s both;
+        }
+
+        .room-details h2 {
+            transition: all 0.3s ease;
+        }
+
+        .room-details h2:hover {
+            transform: translateX(10px);
+            color: #ff6ec4;
+        }
+
+        /* 玩家列表动画 */
+        .players-list {
+            animation: slideInRight 0.8s ease-out 0.4s both;
+        }
+
+        .players-list li {
+            transition: all 0.3s ease;
+            padding: 8px 12px;
+            margin: 5px 0;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border-left: 4px solid #ff6ec4;
+        }
+
+        .players-list li:hover {
+            transform: translateX(5px);
+            background: rgba(255, 110, 196, 0.1);
+        }
+
+        .players-list li.ready {
+            border-left-color: #27ae60;
+            animation: readyPulse 2s ease-in-out infinite;
+        }
+
+        .players-list li.joined {
+            animation: playerJoin 0.6s ease-out;
+        }
+
+        /* 房间控制按钮动画 */
+        .room-controls {
+            animation: slideInRight 0.8s ease-out 0.6s both;
+        }
+
+        .room-controls .btn {
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .room-controls .btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.5s;
+        }
+
+        .room-controls .btn:hover::before {
+            left: 100%;
+        }
+
+        .room-controls .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        #ready-btn.ready {
+            background: linear-gradient(45deg, #27ae60, #2ecc71);
+            animation: pulse 1s ease-in-out infinite;
+        }
+
+        /* 统计框动画 */
+        .stats-container {
+            animation: fadeInUp 0.8s ease-out 0.8s both;
+        }
+
+        .stat-box {
+            transition: all 0.3s ease;
+        }
+
+        .stat-box:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+        }
+
+        .stat-value {
+            transition: all 0.3s ease;
+        }
+
+        .stat-value.updated {
+            animation: pulse 0.6s ease-out;
+            color: #27ae60;
+        }
+
+        /* 消息框动画 */
+        .message-box {
+            transition: all 0.3s ease;
+            animation: fadeInUp 0.8s ease-out 1s both;
+        }
+
+        .message-box.game-over {
+            animation: shake 0.5s ease-in-out;
+            background: linear-gradient(45deg, #e74c3c, #c0392b);
+            color: white;
+        }
+
+        .message-box.countdown {
+            animation: countdown 1s ease-in-out;
+            font-size: 2rem;
+            font-weight: bold;
+            color: #ff6ec4;
+        }
+
+        /* 游戏按钮动画增强 */
+        .game-board {
+            animation: fadeInUp 0.8s ease-out 1.2s both;
+        }
+
+        .color-btn {
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .color-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+            transition: left 0.5s;
+        }
+
+        .color-btn:hover::before {
+            left: 100%;
+        }
+
+        .color-btn:hover {
+            transform: translateY(-3px) scale(1.05);
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        .color-btn.active {
+            animation: glow 0.3s ease-in-out;
+        }
+
+        .color-btn.correct {
+            animation: pulse 0.5s ease-in-out;
+        }
+
+        .color-btn.wrong {
+            animation: shake 0.5s ease-in-out;
+        }
+
+        /* 模态框动画增强 */
+        .modal-content {
+            animation: fadeInUp 0.5s ease-out;
+        }
+
+        .modal-content h2 {
+            animation: bounce 1s ease-in-out;
+        }
+
+        .modal-content h3 {
+            animation: slideInLeft 0.8s ease-out 0.3s both;
+        }
+
+        #score-list {
+            animation: slideInRight 0.8s ease-out 0.5s both;
+        }
+
+        #score-list li {
+            transition: all 0.3s ease;
+            padding: 8px 12px;
+            margin: 5px 0;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        #score-list li:hover {
+            transform: translateX(5px);
+            background: rgba(255, 110, 196, 0.1);
+        }
+
+        #score-list li.winner {
+            background: linear-gradient(45deg, #f39c12, #e67e22);
+            color: white;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        /* 响应式动画调整 */
+        @media (max-width: 768px) {
+            .color-btn:hover {
+                transform: translateY(-2px) scale(1.02);
+            }
+            
+            .stat-box:hover {
+                transform: translateY(-3px);
+            }
+
+            .room-details h2:hover {
+                transform: translateX(5px);
+            }
+        }
+
+        /* 加载动画 */
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #ff6ec4;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* 成功/失败状态动画 */
+        .success-animation {
+            animation: pulse 0.5s ease-in-out;
+            background: linear-gradient(45deg, #27ae60, #2ecc71);
+        }
+
+        .error-animation {
+            animation: shake 0.5s ease-in-out;
+            background: linear-gradient(45deg, #e74c3c, #c0392b);
+        }
+
+        /* 等待动画 */
+        .waiting {
+            animation: pulse 2s ease-in-out infinite;
+            opacity: 0.7;
+        }
+
+        /* 连接状态指示器 */
+        .connection-status {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            background: #27ae60;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        .connection-status.disconnected {
+            background: #e74c3c;
+            animation: shake 0.5s ease-in-out infinite;
+        }
+    </style>
+</head>
+    <body>
+
+        <!-- 连接状态指示器 -->
+        <div class="connection-status" id="connection-status"></div>
+
+        <div class="game-container">
+            <h1>Together We Glow</h1>
+
+            <!-- 房间信息和玩家列表 -->
+            <div class="room-info-container">
+                <div class="room-details">
+                    <h2>room: <span id="current-room">room1</span></h2>
+                    <h2>host: <span id="room-host">waiting...</span></h2>
+                    <h2>players:</h2>
+                    <ul class="players-list" id="player-list">
+                        <!-- 玩家列表将由JS动态加载 -->
+                    </ul>
+                </div>
+                <div class="room-controls">
+                    <button id="ready-btn" class="btn">ready</button>
+                    <button id="start-btn" class="btn">start</button>
+                    <button id="back-btn" class="btn">back</button>
+                </div>
+            </div>
+
+            <!-- 统计信息区域 -->
+            <div class="stats-container">
+                <div class="stat-box">
+                    <div class="stat-label">level</div>
+                    <div id="level-value" class="stat-value">1</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">score</div>
+                    <div id="score-value" class="stat-value">0</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">length</div>
+                    <div id="sequence-length" class="stat-value">3</div>
+                </div>
+            </div>
+
+
+            <!-- 消息框 -->
+            <div class="message-box" id="message-box">
+                Click the 'ready' button and wait for the host to start the game.
+            </div>
+
+            <!-- 游戏按钮区域 -->
+            <div class="game-board">
+                <div class="color-btn" data-color="red" id="red-btn">
+                    <span class="btn-label">red</span>
+                </div>
+                <div class="color-btn" data-color="blue" id="blue-btn">
+                    <span class="btn-label">blue</span>
+                </div>
+                <div class="color-btn" data-color="green" id="green-btn">
+                    <span class="btn-label">green</span>
+                </div>
+                <div class="color-btn" data-color="yellow" id="yellow-btn">
+                    <span class="btn-label">yellow</span>
+                </div>
+            </div>
+
+
+            <!-- 结果弹窗 -->
+            <div id="game-over-modal" class="modal-overlay">
+                <div class="modal-content">
+                    <h2>Game Over</h2>
+                    <p id="modal-message" style="font-style: italic; color: #7f8c8d;"></p>
+                    <h3>Score Board</h3>
+                    <ul id="score-list">
+                        <!-- 分数列表由JS动态加载 -->
+                    </ul>
+                    <div>
+                        <button id="play-again-btn" class="btn success">Play Again</button>
+                        <button id="return-home-btn" class="btn primary">Return to Home</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            const socket = io();
+            sessionStorage.setItem('has_played', 'true');  // 记录用户玩过游戏
+
+            const playerNameFromServer = "{{ player_name }}";  // 从Flask模板传入
+
+            // 鼓励语池 (用于游戏结束模态框)
+            const encouragementMessages = [
+                "That is great! You have made a lot of progress!",
+                "Try again, you will definitely break through yourself!",
+                "Every failure is a step towards success!",
+                "Keep up the good work, victory is ahead!",
+                "Perseverance prevails!"
+            ];
+
+            let currentUsername = playerNameFromServer;
+            let currentRoom = "room1";
+            let selectedColors = [];        // 玩家选择的颜色序列
+            let countdownInterval = null;
+            let gameActive = false; // 标识游戏是否正在进行中
+            let waitingForInput = false; // 标识是否可以接受玩家输入
+            let targetSequence = []; // 目标序列
+
+            // DOM 元素引用
+            const levelValue = document.getElementById('level-value');
+            const scoreValue = document.getElementById('score-value');
+            const sequenceLength = document.getElementById('sequence-length');
+            const messageBox = document.getElementById('message-box');
+            const connectionStatus = document.getElementById('connection-status');
+            // const countdownEl = document.getElementById('countdown');
+            const roomHostEl = document.getElementById('room-host');
+            const playerListEl = document.getElementById('player-list');
+            const readyBtn = document.getElementById('ready-btn');
+            const startBtn = document.getElementById('start-btn');
+            const backBtn = document.getElementById('back-btn');
+            const colorButtons = {
+                red: document.getElementById('red-btn'),
+                blue: document.getElementById('blue-btn'),
+                green: document.getElementById('green-btn'),
+                yellow: document.getElementById('yellow-btn')
+            };
+            const gameOverModal = document.getElementById('game-over-modal');
+            const modalMessage = document.getElementById('modal-message');
+            const scoreListModal = document.getElementById('score-list');
+            const playAgainBtn = document.getElementById('play-again-btn');
+            const returnHomeBtn = document.getElementById('return-home-btn');
+
+            // 连接状态管理
+            function updateConnectionStatus(connected) {
+                if (connected) {
+                    connectionStatus.classList.remove('disconnected');
+                    connectionStatus.title = 'Connected';
+                } else {
+                    connectionStatus.classList.add('disconnected');
+                    connectionStatus.title = 'Disconnected';
+                }
+            }
+
+            // 初始化连接状态
+            updateConnectionStatus(false);
+
+            // -------------------------- WebSocket 事件监听 -----------------------------
+
+            socket.on('connect', () => {
+                console.log("socket[connect]receive::Connected with sid", socket.id);
+                updateConnectionStatus(true);
+                // 将 sid 发送到后端绑定 username
+                socket.emit('register_user', { username: currentUsername, sid: socket.id });
+                joinRoom(); // 自动加入房间
+            });
+
+            socket.on('disconnect', () => {
+                console.log("socket[disconnect]receive:Disconnected from server");
+                updateConnectionStatus(false);
+                // 可以添加一些UI提示，例如显示"已断开连接"
+            });
+
+            // 更新玩家列表
+            socket.on('update_players', (data) => {
+                console.log("socket[update_players]receive:", data);
+                playerListEl.innerHTML = '';       // 清空列表
+                let myScore = 0;
+                Object.entries(data.players).forEach(([name, info]) => {
+                    const li = document.createElement('li');
+                    li.textContent = `${name} - ${info.ready ? 'ready' : 'not ready'}`;
+                    playerListEl.appendChild(li);
+                });
+
+                roomHostEl.textContent = data.host;
+                // 只有房主才能看到开始按钮
+                startBtn.style.display = (data.host === currentUsername) ? "inline-block" : "none";
+                //readyBtn.style.display = (data.host !== currentUsername || !gameActive) ? "inline-block" : "none"; // 房主非游戏进行时也显示准备
+                startBtn.disabled = !Object.values(data.players).every(p => p.ready); // 所有人都准备好才能开始
+                updateGameButtonsState(gameActive); // 根据游戏是否活跃禁用颜色按钮
+            });
+
+            socket.on('game_started', (data) => {
+                console.log("socket[game_started]receive:", data);
+                gameActive = true;
+                waitingForInput = false; // 序列显示期间不能输入
+                targetSequence = data.sequence;
+                levelValue.textContent = data.level;
+                sequenceLength.textContent = targetSequence.length;
+                messageBox.textContent = `Observe the light!`;
+
+                updateGameButtonsState(gameActive); // 禁用颜色按钮
+
+            });
+
+            // 监听"禁止加入"事件
+            socket.on('join_denied', (data) => {
+                alert(data.message || "Unable to join room");
+                // 可选：跳转回模式选择页
+                setTimeout(() => {
+                    window.location.href = '/mode_selection';
+                }, 200);
+            });
+
+            // 更新分数（在每次进入下一轮游戏时）
+            socket.on('update_score', (data) => {
+                console.log("socket[update_score]receive:", data);
+                scoreValue.textContent = data.score;
+            });
+
+
+            // 游戏更新事件 (新序列或超时通知)
+            socket.on('game_update', (data) => {
+                console.log("socket[game_update]receive:", data);
+                // console.log("Game update:", data);
+                if (data.status === 'ready_for_input') {
+                    gameActive = true;
+                    waitingForInput = false;
+                    targetSequence = data.sequence;
+                    levelValue.textContent = data.level;
+                    sequenceLength.textContent = targetSequence.length;
+
+                    messageBox.textContent = `Please click on the color buttons in order (sequence length: ${targetSequence. length})`;
+                    waitingForInput = true;
+                    updateGameButtonsState(gameActive); // 启用颜色按钮
+                    startCountdown(15); // 15秒输入时间
+
+                }
+            });
+
+            // 修改看板事件
+            socket.on('write_messageBox', (data) => { 
+                console.log("socket[write_messageBox]receive:", data);
+                messageBox.textContent = data.message;
+            });
+
+
+
+            // 游戏结束事件
+            socket.on('game_over', (data) => {
+                console.log("socket[game_over]receive:", data);
+                // console.log("Game Over:", data);
+                gameActive = false;
+                waitingForInput = false;
+                clearInterval(countdownInterval);
+                // countdownEl.textContent = ''; // 清空倒计时
+                messageBox.textContent = "Game over! View the score board";
+                updateGameButtonsState(gameActive); // 禁用颜色按钮
+
+                showGameOverModal(data.scores);
+            });
+
+            // -------------------------- 功能 -------------------------
+
+            // 加入房间
+            function joinRoom() {
+                let username = currentUsername;
+                let room = currentRoom;
+
+                socket.emit("join_room", { username, room });
+                console.log("username:", username, "enter room:", room)
+
+            }
+
+            // 准备按钮
+            document.getElementById("ready-btn").onclick = () => {
+                socket.emit('set_ready', { username: currentUsername, room: currentRoom });
+                readyBtn.disabled = true; // 点击准备后禁用自身
+            };
+
+            // 开始按钮 (仅房主可见)
+            document.getElementById("start-btn").onclick = () => {
+                if (startBtn.disabled) return; // 如果未满足开始条件则不执行
+                socket.emit('start_game', { username: currentUsername, room: currentRoom });
+                // 等待2s，提醒用户观察灯光
+                messageBox.textContent = "Observe the light!";
+            };
+
+            // 返回按钮
+            document.getElementById("back-btn").onclick = () => {
+                socket.emit('leave_room', { username: currentUsername, room: currentRoom });
+                window.location.href = '/';
+            };
+
+            // 颜色按钮点击处理
+            Object.values(colorButtons).forEach(btn => {
+                btn.addEventListener('click', () => {
+                    if (!waitingForInput) return; // 不在输入阶段则不响应
+
+                    const color = btn.dataset.color;
+                    selectedColors.push(color);
+                    highlightButton(color);
+
+                    // 如果玩家输入的序列长度达到目标序列长度，则自动提交
+                    if (selectedColors.length === targetSequence.length) {
+                        submitAnswer();
+                    }
+                });
+            });
+
+
+            // 提交答案
+            function submitAnswer() {
+                if (selectedColors.length === 0 && waitingForInput) {
+                    // 如果是超时提交，但玩家未输入任何内容
+                    console.log("No answer submitted due to timeout.");
+                }
+                waitingForInput = false; // 提交后禁用输入
+                clearInterval(countdownInterval); // 停止倒计时
+                // countdownEl.textContent = ''; // 清空倒计时显示
+                // messageBox.textContent = "请等待结果...";
+                // 阻塞延迟2s，提示用户观察灯光
+                messageBox.textContent = "Next turn! Observe the lights!";
+
+                // 发送答案
+                socket.emit('submit_answer', {
+                    username: currentUsername,
+                    room: currentRoom,
+                    answer: selectedColors
+                });
+
+                selectedColors = []; // 清空玩家已选颜色，准备下一轮
+                updateGameButtonsState(gameActive); // 禁用颜色按钮
+            }
+
+
+            // 高亮按钮 (玩家点击时)
+            function highlightButton(color) {
+                const btn = colorButtons[color];
+                if (!btn) return;
+
+                btn.classList.add('player-active'); // 使用不同的class，避免与序列显示冲突
+                setTimeout(() => {
+                    btn.classList.remove('player-active');
+                }, 300);
+            }
+
+
+            // 开始倒计时
+            function startCountdown(seconds) {
+                // countdownEl.textContent = `剩余时间：${seconds} 秒`;
+                messageBox.textContent = `Remaining time: ${seconds} s`;
+                clearInterval(countdownInterval); // 清除旧的倒计时
+
+                countdownInterval = setInterval(() => {
+                    seconds--;
+                    // countdownEl.textContent = `剩余时间：${seconds} 秒`;
+                    messageBox.textContent = `Remaining time: ${seconds} s`;
+                    if (seconds <= 0) {
+                        clearInterval(countdownInterval);
+                        // countdownEl.textContent = '时间到！等待其他玩家...';
+                        messageBox.textContent = 'Time out! Waiting for other players ..';
+                        // 时间到，自动提交当前已输入的答案 (可能为空)
+                        if (waitingForInput) { // 确保只在等待输入时超时才提交
+                           submitAnswer();
+                        }
+                    }
+                }, 1000);
+            }
+
+            // 更新游戏按钮（颜色按钮）的状态
+            function updateGameButtonsState(gameIsActive) {
+                Object.values(colorButtons).forEach(btn => {
+                    btn.classList.toggle('disabled', !gameIsActive || !waitingForInput);
+                });
+            }
+
+            // 显示游戏结束模态框
+            function showGameOverModal(scores) {
+                const randomMsg = encouragementMessages[
+                    Math.floor(Math.random() * encouragementMessages.length)
+                ];
+                modalMessage.textContent = randomMsg;
+
+                scoreListModal.innerHTML = '';
+                Object.entries(scores).sort(([, scoreA], [, scoreB]) => scoreB - scoreA).forEach(([name, score]) => {
+                    const li = document.createElement('li');
+                    li.textContent = `${name}: ${score} pts`;
+                    if (name === currentUsername) {
+                        li.style.fontWeight = 'bold';
+                        li.style.color = 'red';
+                    }
+                    scoreListModal.appendChild(li);
+                });
+
+                gameOverModal.style.display = "flex";
+            }
+
+            // "再玩一局"按钮点击事件
+            playAgainBtn.addEventListener('click', () => {
+                gameOverModal.style.display = 'none';
+                // 回到多人模式页面
+                window.location.href = '/multi';
+            });
+
+            // "返回主页"按钮点击事件
+            returnHomeBtn.addEventListener('click', () => {
+                window.location.href = '/mode_selection';
+            });
+
+            // 模态框点击外部关闭
+            gameOverModal.addEventListener('click', (event) => {
+                if (event.target === gameOverModal) {
+                    // 如果点击的是背景，则返回模式选择页
+                    window.location.href = '/mode_selection';
+                }
+            });
+
+            // 页面加载时执行
+            window.addEventListener('load', () => {
+                document.getElementById('current-room').textContent = currentRoom; // 显示默认房间名
+                updateGameButtonsState(false); // 初始禁用颜色按钮
+                // 自动加入房间会在 socket.on('connect') 中触发
+            });
+
+        </script>
+
+
+    </body>
+</html>
