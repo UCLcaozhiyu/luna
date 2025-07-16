@@ -221,6 +221,8 @@ def run_invite_animation():
                 if dist2 and dist2 <= trigger_distance:
                     print(f"✅ 用户持续靠近 {stay_time} 秒，播放柔和动画")
                     soft_breathing_once()
+                    time.sleep(2)  # 停留2秒
+                    clear_strip()  # 动画后关闭所有LED
                     break  # 播放一次后退出，进入主程序
                 else:
                     print("❌ 用户离开，忽略")
