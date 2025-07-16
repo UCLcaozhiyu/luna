@@ -55,26 +55,40 @@ def get_distance():
         # 模拟距离检测
         return random.uniform(50, 200)
     
-    GPIO.output(TRIG, False)
-    time.sleep(0.0002)
-    GPIO.output(TRIG, True)
-    time.sleep(0.00001)
-    GPIO.output(TRIG, False)
+    try:
+        GPIO.output(TRIG, False)
+        time.sleep(0.0002)
+        GPIO.output(TRIG, True)
+        time.sleep(0.00001)
+        GPIO.output(TRIG, False)
 
-    timeout = time.time() + 0.05
-    while GPIO.input(ECHO) == 0:
-        pulse_start = time.time()
-        if pulse_start > timeout:
+        timeout = time.time() + 0.05
+        pulse_start = None
+        pulse_end = None
+        
+        # 等待ECHO引脚变为高电平
+        while GPIO.input(ECHO) == 0:
+            pulse_start = time.time()
+            if pulse_start > timeout:
+                return None
+
+        # 等待ECHO引脚变为低电平
+        while GPIO.input(ECHO) == 1:
+            pulse_end = time.time()
+            if pulse_end > timeout:
+                return None
+
+        # 确保两个时间戳都已获取
+        if pulse_start is None or pulse_end is None:
             return None
 
-    while GPIO.input(ECHO) == 1:
-        pulse_end = time.time()
-        if pulse_end > timeout:
-            return None
-
-    duration = pulse_end - pulse_start
-    distance = duration * 34300 / 2
-    return round(distance, 2)
+        duration = pulse_end - pulse_start
+        distance = duration * 34300 / 2
+        return round(distance, 2)
+        
+    except Exception as e:
+        print(f"距离检测错误: {e}")
+        return None
 
 # ========== LED 亮度调节 ==========
 def apply_brightness(base_color, brightness_scale):
@@ -357,8 +371,7 @@ def handle_set_ready(data):
 @socketio.on('start_game')
 def handle_start_game(data):
     print("socket[start_game]with data:", data)
-    # 停止邀请检测
-    stop_invite_detection()
+    # 邀请检测已在进入页面时停止，这里不需要再次停止
     
     # 延迟2s再开始
     time.sleep(1)
@@ -489,6 +502,8 @@ def simulate_raspberry_processing_multi(room, level, sequence):
 # -------------------------- 主页 --------------------------
 @app.route('/mode_selection')
 def mode_selection():
+    # 进入模式选择页面时重新启动邀请检测
+    start_invite_detection()
     return render_template('mode_selection.html')
 
 
@@ -533,17 +548,23 @@ def select_mode():
 @app.route('/single')
 def single_player():
     username = session.get('username', 'tourist')
+    # 进入单人游戏页面时停止邀请检测
+    stop_invite_detection()
     return render_template('single.html', player_name=username, game_mode='single')
 
 
 @app.route('/multi')
 def multi_player():
     username = session.get('username', 'tourist')
+    # 进入多人游戏页面时停止邀请检测
+    stop_invite_detection()
     return render_template('multi.html', player_name=username, game_mode='multi')
     # return f"欢迎 {username} 进入【多人模式】页面！"
 
 @app.route('/')
 def index():
+    # 返回主页时重新启动邀请检测
+    start_invite_detection()
     return render_template('mode_selection.html')
 
 # ---------------------------- 单人模式 ---------------------------------
@@ -595,8 +616,7 @@ game_state = GameState()
 @app.route('/api/game/start', methods=['POST'])
 def start_game():
     """开始新游戏"""
-    # 停止邀请检测
-    stop_invite_detection()
+    # 邀请检测已在进入页面时停止，这里不需要再次停止
     
     game_state.reset_game()
     game_state.game_active = True
