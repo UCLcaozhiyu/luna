@@ -382,17 +382,16 @@ game_state = GameState()
 # API端点实现
 @app.route('/api/game/start', methods=['POST'])
 def start_game():
-    """开始新游戏"""
+    """开始新游戏（先播放邀请动画）"""
+    # 先播放邀请动画
+    led_controller.run_invite_animation()
     game_state.reset_game()
     game_state.game_active = True
     sequence = game_state.generate_sequence()
-
     # 延迟2s
     time.sleep(1)
-
     # 模拟树莓派处理线程
     threading.Thread(target=simulate_raspberry_processing, args=(game_state.current_level, sequence,)).start()
-
     return jsonify({
         'status': 'started',
         'level': game_state.current_level,
@@ -469,6 +468,5 @@ def notify_frontend(message):
 
 
 if __name__ == '__main__':
-    # threading.Thread(target=start_socket_server, daemon=True).start()
-    # app.run(host='0.0.0.0', port=5001, debug=True)
+    led_controller.run_invite_animation()  # 启动动画
     socketio.run(app, host='0.0.0.0', port=5000, allow_unsafe_werkzeug = True, debug = True)
