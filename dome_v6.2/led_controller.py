@@ -1,6 +1,7 @@
 import time
 import RPi.GPIO as GPIO
 import random
+import threading
 
 # Attempt to import rpi_ws281x for LED control.
 # If not on a Raspberry Pi, a dummy class will be used.
@@ -233,6 +234,25 @@ def run_invite_animation():
         print("\n🧹 程序终止，清理 GPIO 和灯光...")
         clear_strip()
         GPIO.cleanup()
+
+def wait_for_start_with_animation(timeout=120, stop_event=None):
+    """
+    动画循环播放，直到stop_event被设置或超时（单位秒）。
+    返回True表示用户点击start，False表示超时。
+    """
+    print(f"进入等待start动画模式，最长等待{timeout}秒...")
+    start_time = time.time()
+    while True:
+        if stop_event and stop_event.is_set():
+            print("检测到start按钮被点击，停止动画。")
+            clear_strip()
+            return True
+        if time.time() - start_time > timeout:
+            print("等待start超时，停止动画，回到靠近检测状态。")
+            clear_strip()
+            return False
+        soft_breathing_once()
+        time.sleep(0.2)  # 动画间隔
 
 
 # Call turn_off_all_leds when the module is imported or script exits

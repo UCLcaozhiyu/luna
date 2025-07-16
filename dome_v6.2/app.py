@@ -380,17 +380,44 @@ game_state = GameState()
 
 
 # API端点实现
+waiting_for_start = False
+waiting_thread = None
+waiting_stop_event = None
+
+# 修改run_invite_animation流程，集成等待start动画
+
+def invite_and_wait_start():
+    """
+    先靠近检测，检测到人后进入动画循环，等待start或超时。
+    """
+    global waiting_for_start, waiting_thread, waiting_stop_event
+    while True:
+        led_controller.run_invite_animation()  # 靠近检测+一次动画
+        # 进入等待start动画
+        waiting_for_start = True
+        waiting_stop_event = threading.Event()
+        result = led_controller.wait_for_start_with_animation(timeout=120, stop_event=waiting_stop_event)
+        waiting_for_start = False
+        if result:
+            print("用户点击start，进入游戏流程。")
+            break  # 进入游戏
+        else:
+            print("超时未点击start，重新等待靠近检测。")
+            continue  # 回到靠近检测
+
 @app.route('/api/game/start', methods=['POST'])
 def start_game():
-    """开始新游戏（先播放邀请动画）"""
-    # 先播放邀请动画
-    led_controller.run_invite_animation()
+    """开始新游戏（等待动画机制）"""
+    global waiting_for_start, waiting_stop_event
+    if not waiting_for_start:
+        return jsonify({'status': 'not_ready', 'msg': '请先靠近感应区并等待动画'}), 400
+    # 用户点击start，通知动画线程停止
+    if waiting_stop_event:
+        waiting_stop_event.set()
     game_state.reset_game()
     game_state.game_active = True
     sequence = game_state.generate_sequence()
-    # 延迟2s
     time.sleep(1)
-    # 模拟树莓派处理线程
     threading.Thread(target=simulate_raspberry_processing, args=(game_state.current_level, sequence,)).start()
     return jsonify({
         'status': 'started',
@@ -468,5 +495,6 @@ def notify_frontend(message):
 
 
 if __name__ == '__main__':
-    led_controller.run_invite_animation()  # 启动动画
+    # 启动时先进入等待动画机制
+    invite_and_wait_start()
     socketio.run(app, host='0.0.0.0', port=5000, allow_unsafe_werkzeug = True, debug = True)
