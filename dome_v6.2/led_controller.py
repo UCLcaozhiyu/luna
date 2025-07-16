@@ -26,7 +26,7 @@ except ImportError:
             pass
 
 # --- LED Configuration ---
-LED_COUNT = 120      # 总共60个灯珠
+LED_COUNT = 120      # 总共120个灯珠
 LED_PIN = 18        # 连接到像素的GPIO引脚 (18使用PWM!)
 LED_FREQ_HZ = 800000 # LED信号频率（赫兹）(通常为800khz)
 LED_DMA = 10        # 用于生成信号的DMA通道 (尝试10)

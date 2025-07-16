@@ -26,7 +26,7 @@ except ImportError:
             pass
 
 # --- LED Configuration ---
-LED_COUNT = 60      # 总共60个灯珠
+LED_COUNT = 120      # 总共120个灯珠
 LED_PIN = 18        # 连接到像素的GPIO引脚 (18使用PWM!)
 LED_FREQ_HZ = 800000 # LED信号频率（赫兹）(通常为800khz)
 LED_DMA = 10        # 用于生成信号的DMA通道 (尝试10)
@@ -42,7 +42,7 @@ GREEN_COLOR = Color(0, 255, 0)
 OFF_COLOR = Color(0, 0, 0)
 
 # Zone Definitions (each zone 15 LEDs)
-ZONE_SIZE = 15
+ZONE_SIZE = 30
 ZONES = {
     'red': (0, ZONE_SIZE),            # 0-14
     'yellow': (ZONE_SIZE, ZONE_SIZE * 2),    # 15-29
