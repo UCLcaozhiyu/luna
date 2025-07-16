@@ -495,6 +495,6 @@ def notify_frontend(message):
 
 
 if __name__ == '__main__':
-    # 启动时先进入等待动画机制
-    invite_and_wait_start()
+    # 先启动Flask服务，再后台线程运行等待动画机制
+    threading.Thread(target=invite_and_wait_start, daemon=True).start()
     socketio.run(app, host='0.0.0.0', port=5000, allow_unsafe_werkzeug = True, debug = True)
