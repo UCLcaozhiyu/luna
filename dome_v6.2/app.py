@@ -1,7 +1,7 @@
 import json
 import socket
 from flask_socketio import SocketIO, emit
-from flask import Flask, render_template, jsonify, request, redirect, url_for, session, g
+from flask import Flask, render_template, jsonify, request, redirect, url_for, session
 import random
 import threading
 import time
@@ -275,18 +275,8 @@ def simulate_raspberry_processing_multi(room, level, sequence):
 
 
 # -------------------------- 主页 --------------------------
-# 线程安全启动动画线程
-thread_lock = threading.Lock()
-def start_invite_thread():
-    global waiting_thread, waiting_for_start, waiting_stop_event
-    with thread_lock:
-        if not waiting_for_start and (waiting_thread is None or not waiting_thread.is_alive()):
-            waiting_thread = threading.Thread(target=invite_and_wait_start, daemon=True)
-            waiting_thread.start()
-
 @app.route('/mode_selection')
 def mode_selection():
-    start_invite_thread()  # 返回主页时重启动画
     return render_template('mode_selection.html')
 
 
@@ -309,7 +299,6 @@ def save_username():
 
 @app.route('/api/select_mode', methods=['POST'])
 def select_mode():
-    global waiting_stop_event
     data = request.json
     mode = data.get('mode')  # 'single' or 'multi'
     username = session.get('username', 'tourist')
@@ -320,9 +309,7 @@ def select_mode():
     # 保存用户名和模式（可选）
     session['player_name'] = username
     session['game_mode'] = mode
-    # 用户点击Start Adventure，终止动画
-    if waiting_stop_event:
-        waiting_stop_event.set()
+
     # 返回对应的页面路径
     return jsonify({
         'redirect': '/single' if mode == 'single' else '/multi',
@@ -345,7 +332,6 @@ def multi_player():
 
 @app.route('/')
 def index():
-    start_invite_thread()  # 返回主页时重启动画
     return render_template('mode_selection.html')
 
 # ---------------------------- 单人模式 ---------------------------------
@@ -394,45 +380,19 @@ game_state = GameState()
 
 
 # API端点实现
-waiting_for_start = False
-waiting_thread = None
-waiting_stop_event = None
-
-# 修改run_invite_animation流程，集成等待start动画
-
-def invite_and_wait_start():
-    """
-    先靠近检测，检测到人后进入动画循环，等待start或超时。
-    """
-    global waiting_for_start, waiting_thread, waiting_stop_event
-    while True:
-        led_controller.run_invite_animation()  # 靠近检测+一次动画
-        # 进入等待start动画
-        waiting_for_start = True
-        waiting_stop_event = threading.Event()
-        result = led_controller.wait_for_start_with_animation(timeout=120, stop_event=waiting_stop_event)
-        waiting_for_start = False
-        if result:
-            print("用户点击start，进入游戏流程。")
-            break  # 进入游戏
-        else:
-            print("超时未点击start，重新等待靠近检测。")
-            continue  # 回到靠近检测
-
 @app.route('/api/game/start', methods=['POST'])
 def start_game():
-    """开始新游戏（等待动画机制）"""
-    global waiting_for_start, waiting_stop_event
-    if not waiting_for_start:
-        return jsonify({'status': 'not_ready', 'msg': '请先靠近感应区并等待动画'}), 400
-    # 用户点击start，通知动画线程停止
-    if waiting_stop_event:
-        waiting_stop_event.set()
+    """开始新游戏"""
     game_state.reset_game()
     game_state.game_active = True
     sequence = game_state.generate_sequence()
+
+    # 延迟2s
     time.sleep(1)
+
+    # 模拟树莓派处理线程
     threading.Thread(target=simulate_raspberry_processing, args=(game_state.current_level, sequence,)).start()
+
     return jsonify({
         'status': 'started',
         'level': game_state.current_level,
@@ -509,6 +469,6 @@ def notify_frontend(message):
 
 
 if __name__ == '__main__':
-    # 先启动Flask服务，再后台线程运行等待动画机制
-    threading.Thread(target=invite_and_wait_start, daemon=True).start()
+    # threading.Thread(target=start_socket_server, daemon=True).start()
+    # app.run(host='0.0.0.0', port=5001, debug=True)
     socketio.run(app, host='0.0.0.0', port=5000, allow_unsafe_werkzeug = True, debug = True)
