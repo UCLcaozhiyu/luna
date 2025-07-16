@@ -44,9 +44,10 @@ soft_colors = [
 ] if IS_RPI_ENV else []
 
 # ========== 邀请检测状态 ==========
-invite_detection_active = True
+invite_detection_active = False  # 初始状态为False
 game_started = False
 invite_thread = None  # 存储邀请检测线程的引用
+invite_thread_lock = threading.Lock()  # 添加线程锁
 
 # ========== 距离检测函数 ==========
 def get_distance():
@@ -63,8 +64,8 @@ def get_distance():
         GPIO.output(TRIG, False)
 
         timeout = time.time() + 0.05
-        pulse_start = None
-        pulse_end = None
+        pulse_start = None  # 初始化变量
+        pulse_end = None    # 初始化变量
         
         # 等待ECHO引脚变为高电平
         while GPIO.input(ECHO) == 0:
@@ -94,7 +95,7 @@ def get_distance():
 def apply_brightness(base_color, brightness_scale):
     """应用亮度调节到LED灯带"""
     if not IS_RPI_ENV:
-        print(f"模拟LED: 应用亮度 {brightness_scale} 到颜色 {base_color}")
+        # 在模拟环境中不输出过多日志
         return
     
     r = ((base_color >> 16) & 0xFF) * brightness_scale // 255
@@ -109,8 +110,13 @@ def apply_brightness(base_color, brightness_scale):
 def soft_breathing_once(step_delay=0.008):
     """播放一次呼吸灯动画"""
     if not IS_RPI_ENV:
-        print("模拟LED: 播放呼吸灯动画")
-        time.sleep(0.5)
+        print("🌈 模拟LED: 播放呼吸灯动画")
+        # 模拟动画也要支持中断
+        for i in range(10):
+            if not invite_detection_active or game_started:
+                print("🛑 动画被中断")
+                return
+            time.sleep(0.05)  # 总共0.5秒
         return
     
     color = random.choice(soft_colors)
@@ -136,7 +142,7 @@ def soft_breathing_once(step_delay=0.008):
 def clear_invite_strip():
     """清空邀请动画的LED灯带"""
     if not IS_RPI_ENV:
-        print("模拟LED: 清空邀请动画灯带")
+        print("💡 模拟LED: 清空邀请动画灯带")
         return
     
     for i in range(invite_strip.numPixels()):
@@ -150,7 +156,6 @@ def invite_detection_thread():
     
     print("🎯 邀请检测线程启动...")
     trigger_distance = 150  # 触发距离（单位 cm）
-    stay_time = 2           # 停留秒数
     animation_interval = 3  # 每3秒重复播放动画
 
     last_play_time = 0
@@ -200,18 +205,24 @@ def invite_detection_thread():
 def start_invite_detection():
     """启动邀请检测后台线程"""
     global invite_detection_active, game_started, invite_thread
-    invite_detection_active = True
-    game_started = False
-    invite_thread = threading.Thread(target=invite_detection_thread, daemon=True)
-    invite_thread.start()
-    print("🚀 邀请检测已启动")
+    
+    with invite_thread_lock:  # 使用线程锁防止竞争
+        # 如果已有线程在运行，先停止它
+        if invite_thread and invite_thread.is_alive():
+            print("🔄 检测到已有邀请检测线程，先停止...")
+            stop_invite_detection_internal()
+        
+        invite_detection_active = True
+        game_started = False
+        invite_thread = threading.Thread(target=invite_detection_thread, daemon=True)
+        invite_thread.start()
+        print("🚀 邀请检测已启动")
 
-# ========== 停止邀请检测 ==========
-def stop_invite_detection():
-    """停止邀请检测"""
+# ========== 停止邀请检测（内部函数） ==========
+def stop_invite_detection_internal():
+    """内部停止函数，不使用锁"""
     global invite_detection_active, game_started, invite_thread
     
-    print("🛑 正在停止邀请检测...")
     invite_detection_active = False
     game_started = True
     
@@ -225,6 +236,16 @@ def stop_invite_detection():
             print("⚠️ 邀请检测线程未能在1秒内停止，但已设置停止标志")
         else:
             print("✅ 邀请检测线程已成功停止")
+
+# ========== 停止邀请检测（公共函数） ==========
+def stop_invite_detection():
+    """停止邀请检测"""
+    global invite_detection_active, game_started, invite_thread
+    
+    print("🛑 正在停止邀请检测...")
+    
+    with invite_thread_lock:  # 使用线程锁防止竞争
+        stop_invite_detection_internal()
     
     print("⏹️ 邀请检测已停止")
 
@@ -526,12 +547,17 @@ def save_username():
 
 @app.route('/api/select_mode', methods=['POST'])
 def select_mode():
+    """选择游戏模式 - 立即停止邀请检测"""
     data = request.json
     mode = data.get('mode')  # 'single' or 'multi'
     username = session.get('username', 'tourist')
 
     if not username or mode not in ['single', 'multi']:
         return jsonify({'error': 'Invalid input'}), 400
+
+    # 🔧 修复：在API调用时立即停止邀请检测
+    print(f"🎮 用户 {username} 选择了 {mode} 模式，停止邀请检测")
+    stop_invite_detection()
 
     # 保存用户名和模式（可选）
     session['player_name'] = username
@@ -548,7 +574,7 @@ def select_mode():
 @app.route('/single')
 def single_player():
     username = session.get('username', 'tourist')
-    # 进入单人游戏页面时停止邀请检测
+    # 确保邀请检测已停止（双重保险）
     stop_invite_detection()
     return render_template('single.html', player_name=username, game_mode='single')
 
@@ -556,10 +582,10 @@ def single_player():
 @app.route('/multi')
 def multi_player():
     username = session.get('username', 'tourist')
-    # 进入多人游戏页面时停止邀请检测
+    # 确保邀请检测已停止（双重保险）
     stop_invite_detection()
     return render_template('multi.html', player_name=username, game_mode='multi')
-    # return f"欢迎 {username} 进入【多人模式】页面！"
+
 
 @app.route('/')
 def index():
@@ -616,7 +642,8 @@ game_state = GameState()
 @app.route('/api/game/start', methods=['POST'])
 def start_game():
     """开始新游戏"""
-    # 邀请检测已在进入页面时停止，这里不需要再次停止
+    # 确保邀请检测已停止
+    stop_invite_detection()
     
     game_state.reset_game()
     game_state.game_active = True
