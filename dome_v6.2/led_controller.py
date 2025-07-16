@@ -189,12 +189,16 @@ def apply_brightness(base_color, brightness):
         strip.setPixelColor(i, color)
     strip.show()
 
-def soft_breathing_once(step_delay=0.015):
+def soft_breathing_once(step_delay=0.015, stop_event=None):
     color = random.choice(soft_colors)
     for b in range(0, 256, 5):
+        if stop_event and stop_event.is_set():
+            break
         apply_brightness(color, b)
         time.sleep(step_delay)
     for b in range(255, -1, -5):
+        if stop_event and stop_event.is_set():
+            break
         apply_brightness(color, b)
         time.sleep(step_delay)
 
@@ -251,7 +255,7 @@ def wait_for_start_with_animation(timeout=120, stop_event=None):
             print("等待start超时，停止动画，回到靠近检测状态。")
             clear_strip()
             return False
-        soft_breathing_once()
+        soft_breathing_once(stop_event=stop_event)
         time.sleep(0.2)  # 动画间隔
 
 
