@@ -1,4 +1,6 @@
 import time
+import threading
+import random
 
 # Attempt to import rpi_ws281x for LED control.
 # If not on a Raspberry Pi, a dummy class will be used.
@@ -24,6 +26,113 @@ except ImportError:
             pass
         def show(self):
             pass
+
+# ========== HC-SR04 设置 ==========
+try:
+    import RPi.GPIO as GPIO
+    TRIG = 23
+    ECHO = 24
+    GPIO.setmode(GPIO.BCM)
+    GPIO.setup(TRIG, GPIO.OUT)
+    GPIO.setup(ECHO, GPIO.IN)
+    IS_GPIO_ENV = True
+except Exception:
+    IS_GPIO_ENV = False
+    def dummy_distance():
+        return 200
+    GPIO = None
+    TRIG = None
+    ECHO = None
+
+def get_distance():
+    if not IS_GPIO_ENV:
+        return 200
+    GPIO.output(TRIG, False)
+    time.sleep(0.0002)
+    GPIO.output(TRIG, True)
+    time.sleep(0.00001)
+    GPIO.output(TRIG, False)
+    timeout = time.time() + 0.05
+    while GPIO.input(ECHO) == 0:
+        pulse_start = time.time()
+        if pulse_start > timeout:
+            return None
+    while GPIO.input(ECHO) == 1:
+        pulse_end = time.time()
+        if pulse_end > timeout:
+            return None
+    duration = pulse_end - pulse_start
+    distance = duration * 34300 / 2
+    return round(distance, 2)
+
+# ========== 呼吸灯动画 =============
+soft_colors = [
+    Color(255, 128, 128),  # 柔红
+    Color(255, 165, 100),  # 柔橙
+    Color(255, 255, 128),  # 柔黄
+    Color(144, 238, 144),  # 柔绿
+    Color(128, 224, 224),  # 柔青
+    Color(173, 216, 230),  # 柔蓝
+    Color(216, 160, 240),  # 柔紫
+]
+
+def apply_brightness(base_color, brightness_scale):
+    r = ((base_color >> 16) & 0xFF) * brightness_scale // 255
+    g = ((base_color >> 8) & 0xFF) * brightness_scale // 255
+    b = (base_color & 0xFF) * brightness_scale // 255
+    color = Color(r, g, b)
+    if not IS_RPI_ENV:
+        return
+    for i in range(LED_COUNT):
+        strip.setPixelColor(i, color)
+    strip.show()
+
+def soft_breathing_once(step_delay=0.008):
+    color = random.choice(soft_colors)
+    for b in range(0, 256, 8):  # 渐亮
+        apply_brightness(color, b)
+        time.sleep(step_delay)
+    time.sleep(0.1)
+    for b in range(255, -1, -8):  # 渐灭
+        apply_brightness(color, b)
+        time.sleep(step_delay)
+
+def clear_strip():
+    if not IS_RPI_ENV:
+        return
+    for i in range(LED_COUNT):
+        strip.setPixelColor(i, Color(0, 0, 0))
+    strip.show()
+
+# ========== 呼吸灯检测线程 =============
+_soft_invite_thread = None
+_soft_invite_stop_event = threading.Event()
+
+def _soft_invite_loop():
+    while not _soft_invite_stop_event.is_set():
+        dist = get_distance()
+        if dist and dist <= 100:
+            clear_strip()
+            # 20秒暂停动画和检测
+            for _ in range(200):
+                if _soft_invite_stop_event.is_set():
+                    break
+                time.sleep(0.1)
+        else:
+            soft_breathing_once()
+        time.sleep(0.1)
+
+def start_soft_invite_loop():
+    global _soft_invite_thread
+    if _soft_invite_thread and _soft_invite_thread.is_alive():
+        return
+    _soft_invite_stop_event.clear()
+    _soft_invite_thread = threading.Thread(target=_soft_invite_loop, daemon=True)
+    _soft_invite_thread.start()
+
+def stop_soft_invite_loop():
+    _soft_invite_stop_event.set()
+    clear_strip()
 
 # --- LED Configuration ---
 LED_COUNT = 120      # 总共120个灯珠
