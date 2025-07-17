@@ -36,6 +36,7 @@ if IS_RPI_ENV:
 invite_detection_active = False
 invite_thread = None
 person_detected = False
+game_has_led_control = False  # 游戏是否拥有LED控制权
 
 # 柔和彩虹色列表
 soft_colors = [
@@ -102,6 +103,13 @@ def apply_brightness(base_color, brightness_scale):
 
 def play_3second_animation():
     """播放持续3秒的呼吸灯动画"""
+    global game_has_led_control
+    
+    # 检查游戏是否拥有LED控制权
+    if game_has_led_control:
+        print("🎮 游戏拥有LED控制权，邀请动画跳过")
+        return
+    
     if not IS_RPI_ENV:
         print("🌈 模拟LED: 播放3秒邀请动画")
         time.sleep(3)
@@ -119,18 +127,21 @@ def play_3second_animation():
     for cycle in range(2):  # 播放2个呼吸周期
         # 渐亮阶段
         for b in range(0, 256, 16):
-            if not invite_detection_active:  # 检查是否需要停止
+            if not invite_detection_active or game_has_led_control:  # 检查是否需要停止
                 clear_invite_strip()
                 return
             apply_brightness(color, b)
             time.sleep(step_delay)
         
         # 停留阶段
+        if not invite_detection_active or game_has_led_control:
+            clear_invite_strip()
+            return
         time.sleep(step_delay * 5)
         
         # 渐灭阶段
         for b in range(255, -1, -16):
-            if not invite_detection_active:  # 检查是否需要停止
+            if not invite_detection_active or game_has_led_control:  # 检查是否需要停止
                 clear_invite_strip()
                 return
             apply_brightness(color, b)
@@ -150,7 +161,7 @@ def clear_invite_strip():
 
 def invite_detection_thread():
     """后台线程：检测人员靠近并播放邀请动画"""
-    global invite_detection_active, person_detected
+    global invite_detection_active, person_detected, game_has_led_control
     
     print("🎯 邀请检测线程启动...")
     trigger_distance = 150  # 触发距离（单位 cm）
@@ -168,11 +179,13 @@ def invite_detection_thread():
                 # 检测到人靠近
                 if dist <= trigger_distance:
                     # 只有在之前没有检测到人的情况下才播放动画
-                    if not person_detected:
+                    if not person_detected and not game_has_led_control:
                         print("✅ 检测到人员靠近，开始播放动画！")
                         play_3second_animation()
                         person_detected = True  # 标记为已检测到人
                         print("🎯 动画播放完成，等待人员离开...")
+                    elif game_has_led_control:
+                        print("🎮 游戏进行中，邀请检测待机...")
                 else:
                     # 人离开了，重置检测状态
                     if person_detected:
@@ -224,6 +237,20 @@ def stop_invite_detection():
             print("✅ 邀请检测线程已成功停止")
     
     print("⏹️ 邀请检测系统已停止")
+
+def take_led_control():
+    """游戏获取LED控制权"""
+    global game_has_led_control
+    print("🎮 游戏获取LED控制权")
+    game_has_led_control = True
+    clear_invite_strip()  # 清空邀请动画
+
+def release_led_control():
+    """游戏释放LED控制权"""
+    global game_has_led_control, person_detected
+    print("🎯 游戏释放LED控制权，邀请检测恢复")
+    game_has_led_control = False
+    person_detected = False  # 重置检测状态
 
 # ========== Flask应用配置 ==========
 app = Flask(__name__)
@@ -298,7 +325,7 @@ def handle_disconnect():
             user_sids.pop(username, None)
             break
 
-# 加入房间 - 关键修改点
+# 加入房间 - 移除停止邀请检测的逻辑
 @socketio.on('join_room')
 def join_room(data):
     print("socket[join_room]with data:", data)
@@ -307,8 +334,7 @@ def join_room(data):
 
     print(f"{username} 加入 {room}")
     
-    # 🔥 关键：有玩家加入房间时停止邀请检测
-    stop_invite_detection()
+    # 🔥 修改：加入房间时不再停止邀请检测，让其他玩家也能看到邀请动画
 
     if room in rooms and rooms[room]['game_active']:
         # 游戏已经开始，不允许加入
@@ -354,6 +380,10 @@ def handle_set_ready(data):
 @socketio.on('start_game')
 def handle_start_game(data):
     print("socket[start_game]with data:", data)
+    
+    # 🔥 关键：游戏开始时获取LED控制权
+    take_led_control()
+    
     # 延迟2s再开始
     time.sleep(1)
     room = data['room']
@@ -445,10 +475,8 @@ def end_game(room):
     if room in rooms:
         del rooms[room]
     
-    # 🔥 关键：游戏结束后，如果没有活跃房间，重新启动邀请检测
-    if not rooms:
-        print("🔄 所有游戏结束，重新启动邀请检测系统")
-        start_invite_detection()
+    # 🔥 关键：游戏结束后释放LED控制权
+    release_led_control()
 
 # 树莓派处理模拟
 def simulate_raspberry_processing_multi(room, level, sequence):
@@ -512,21 +540,19 @@ def select_mode():
 @app.route('/single')
 def single_player():
     username = session.get('username', 'tourist')
-    # 进入单人模式也停止邀请检测
-    stop_invite_detection()
+    # 🔥 修改：进入单人模式不再停止邀请检测
     return render_template('single.html', player_name=username, game_mode='single')
 
 @app.route('/multi')
 def multi_player():
     username = session.get('username', 'tourist')
-    # 进入多人模式也停止邀请检测
-    stop_invite_detection()
+    # 🔥 修改：进入多人模式不再停止邀请检测
     return render_template('multi.html', player_name=username, game_mode='multi')
 
 @app.route('/')
 def index():
     # 访问主页时启动邀请检测
-    if not rooms:  # 只有在没有活跃房间时才启动
+    if not invite_detection_active:  # 只有在未启动时才启动
         start_invite_detection()
     return render_template('mode_selection.html')
 
@@ -576,6 +602,9 @@ game_state = GameState()
 @app.route('/api/game/start', methods=['POST'])
 def start_game():
     """开始新游戏"""
+    # 🔥 关键：单人游戏开始时获取LED控制权
+    take_led_control()
+    
     game_state.reset_game()
     game_state.game_active = True
     sequence = game_state.generate_sequence()
@@ -609,8 +638,8 @@ def check_sequence():
             'nextLevel': game_state.current_level
         })
     else:
-        # 🔥 关键：单人游戏结束后重新启动邀请检测
-        start_invite_detection()
+        # 🔥 关键：单人游戏结束后释放LED控制权
+        release_led_control()
         return jsonify({
             'result': 'incorrect',
             'final_score': game_state.player_score,
@@ -638,8 +667,8 @@ def get_sequence():
 def reset_game():
     """重置游戏状态"""
     game_state.reset_game()
-    # 🔥 关键：重置游戏后重新启动邀请检测
-    start_invite_detection()
+    # 🔥 关键：重置游戏后释放LED控制权
+    release_led_control()
     return jsonify({'status': 'reset', 'score': 0, 'level': 1})
 
 # 树莓派处理模拟
