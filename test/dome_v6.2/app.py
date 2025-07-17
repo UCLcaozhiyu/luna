@@ -7,32 +7,37 @@ import threading
 import time
 import led_controller
 
-# 添加HC-SR04传感器支持
+# 邀请检测系统导入
 try:
     import RPi.GPIO as GPIO
     from rpi_ws281x import PixelStrip, Color
     IS_RPI_ENV = True
-    print("Raspberry Pi环境检测成功，启用HC-SR04传感器和LED动画")
+    print("✅ 检测到Raspberry Pi环境，启用邀请检测系统")
 except ImportError:
     IS_RPI_ENV = False
-    print("非Raspberry Pi环境，传感器功能将被模拟")
+    print("✅ 检测到开发环境，邀请检测系统将使用模拟模式")
 
-# ========== HC-SR04 传感器设置 ==========
+# ========== 邀请检测系统配置 ==========
 if IS_RPI_ENV:
+    # HC-SR04传感器设置
     TRIG = 23
     ECHO = 24
     GPIO.setmode(GPIO.BCM)
     GPIO.setup(TRIG, GPIO.OUT)
     GPIO.setup(ECHO, GPIO.IN)
-
-# ========== 邀请动画LED设置 ==========
-if IS_RPI_ENV:
+    
+    # 邀请动画LED设置
     INVITE_LED_COUNT = 120
     INVITE_LED_PIN = 18
     invite_strip = PixelStrip(INVITE_LED_COUNT, INVITE_LED_PIN, 800000, 10, False, 255, 0)
     invite_strip.begin()
 
-# ========== 明亮柔和彩虹色列表 ==========
+# 邀请检测状态
+invite_detection_active = False
+invite_thread = None
+person_detected = False
+
+# 柔和彩虹色列表
 soft_colors = [
     Color(255, 128, 128),  # 柔红
     Color(255, 165, 100),  # 柔橙
@@ -43,13 +48,7 @@ soft_colors = [
     Color(216, 160, 240),  # 柔紫
 ] if IS_RPI_ENV else []
 
-# ========== 邀请检测状态 ==========
-invite_detection_active = False
-game_started = False
-invite_thread = None
-FORCE_STOP_INVITE = False  # 🔧 新增：强制停止邀请检测的开关
-
-# ========== 距离检测函数 ==========
+# ========== 邀请检测系统函数 ==========
 def get_distance():
     """获取HC-SR04传感器检测的距离"""
     if not IS_RPI_ENV:
@@ -67,19 +66,16 @@ def get_distance():
         pulse_start = None
         pulse_end = None
         
-        # 等待ECHO引脚变为高电平
         while GPIO.input(ECHO) == 0:
             pulse_start = time.time()
             if pulse_start > timeout:
                 return None
 
-        # 等待ECHO引脚变为低电平
         while GPIO.input(ECHO) == 1:
             pulse_end = time.time()
             if pulse_end > timeout:
                 return None
 
-        # 确保两个时间戳都已获取
         if pulse_start is None or pulse_end is None:
             return None
 
@@ -91,7 +87,6 @@ def get_distance():
         print(f"距离检测错误: {e}")
         return None
 
-# ========== LED 亮度调节 ==========
 def apply_brightness(base_color, brightness_scale):
     """应用亮度调节到LED灯带"""
     if not IS_RPI_ENV:
@@ -105,97 +100,86 @@ def apply_brightness(base_color, brightness_scale):
         invite_strip.setPixelColor(i, color)
     invite_strip.show()
 
-# ========== 呼吸灯动画 ==========
-def soft_breathing_once(step_delay=0.008):
-    """播放一次呼吸灯动画"""
-    global FORCE_STOP_INVITE  # 🔧 新增
-    
+def play_3second_animation():
+    """播放持续3秒的呼吸灯动画"""
     if not IS_RPI_ENV:
-        print("🌈 模拟LED: 播放呼吸灯动画")
-        # 🔧 修改：模拟动画时也检查强制停止
-        for i in range(10):
-            if FORCE_STOP_INVITE:
-                print("🛑 模拟动画被强制停止")
-                return
-            time.sleep(0.05)
+        print("🌈 模拟LED: 播放3秒邀请动画")
+        time.sleep(3)
         return
     
+    print("🌈 开始播放3秒邀请动画...")
     color = random.choice(soft_colors)
-    for b in range(0, 256, 8):  # 渐亮
-        # 🔧 新增：检查强制停止
-        if FORCE_STOP_INVITE:
-            print("🛑 呼吸灯动画被强制停止")
-            return
-        apply_brightness(color, b)
-        time.sleep(step_delay)
     
-    time.sleep(0.1)
+    # 计算动画参数：3秒内完成呼吸效果
+    total_duration = 3.0
+    steps = 60
+    step_delay = total_duration / steps
     
-    for b in range(255, -1, -8):  # 渐灭
-        # 🔧 新增：检查强制停止
-        if FORCE_STOP_INVITE:
-            print("🛑 呼吸灯动画被强制停止")
-            return
-        apply_brightness(color, b)
-        time.sleep(step_delay)
+    # 呼吸动画：渐亮 -> 停留 -> 渐灭
+    for cycle in range(2):  # 播放2个呼吸周期
+        # 渐亮阶段
+        for b in range(0, 256, 16):
+            if not invite_detection_active:  # 检查是否需要停止
+                clear_invite_strip()
+                return
+            apply_brightness(color, b)
+            time.sleep(step_delay)
+        
+        # 停留阶段
+        time.sleep(step_delay * 5)
+        
+        # 渐灭阶段
+        for b in range(255, -1, -16):
+            if not invite_detection_active:  # 检查是否需要停止
+                clear_invite_strip()
+                return
+            apply_brightness(color, b)
+            time.sleep(step_delay)
+    
+    clear_invite_strip()
+    print("✅ 3秒动画播放完成")
 
-# ========== 清空邀请动画灯带 ==========
 def clear_invite_strip():
     """清空邀请动画的LED灯带"""
     if not IS_RPI_ENV:
-        print("💡 模拟LED: 清空邀请动画灯带")
         return
     
     for i in range(invite_strip.numPixels()):
         invite_strip.setPixelColor(i, Color(0, 0, 0))
     invite_strip.show()
 
-# ========== 邀请检测线程 ==========
 def invite_detection_thread():
     """后台线程：检测人员靠近并播放邀请动画"""
-    global invite_detection_active, game_started, FORCE_STOP_INVITE  # 🔧 新增
+    global invite_detection_active, person_detected
     
     print("🎯 邀请检测线程启动...")
-    trigger_distance = 150
-    animation_interval = 3
-    last_play_time = 0
-    detected = False
-
-    # 🔧 修改：添加强制停止检查
-    while invite_detection_active and not game_started and not FORCE_STOP_INVITE:
+    trigger_distance = 150  # 触发距离（单位 cm）
+    
+    while invite_detection_active:
         try:
-            # 🔧 新增：检查强制停止标志
-            if FORCE_STOP_INVITE:
-                print("🛑 收到强制停止信号，立即退出")
+            if not invite_detection_active:
                 break
                 
             dist = get_distance()
-            if IS_RPI_ENV:
-                print(f"🔍 当前距离：{dist} cm")
+            if dist is not None:
+                if IS_RPI_ENV:
+                    print(f"🔍 当前距离：{dist} cm")
+                
+                # 检测到人靠近
+                if dist <= trigger_distance:
+                    # 只有在之前没有检测到人的情况下才播放动画
+                    if not person_detected:
+                        print("✅ 检测到人员靠近，开始播放动画！")
+                        play_3second_animation()
+                        person_detected = True  # 标记为已检测到人
+                        print("🎯 动画播放完成，等待人员离开...")
+                else:
+                    # 人离开了，重置检测状态
+                    if person_detected:
+                        print("👋 人员离开，重置检测状态")
+                        person_detected = False
 
-            if dist and dist <= trigger_distance:
-                if not detected:
-                    print("✅ 检测到人员靠近，开始播放邀请动画")
-                    # 🔧 新增：播放前再检查一次
-                    if FORCE_STOP_INVITE:
-                        break
-                    soft_breathing_once()
-                    last_play_time = time.time()
-                    detected = True
-                elif time.time() - last_play_time >= animation_interval:
-                    print("🔁 持续检测到人员，循环播放邀请动画")
-                    # 🔧 新增：播放前再检查一次
-                    if FORCE_STOP_INVITE:
-                        break
-                    soft_breathing_once()
-                    last_play_time = time.time()
-            else:
-                if detected:
-                    print("👋 人员离开，停止邀请动画")
-                    clear_invite_strip()
-                    detected = False
-
-            time.sleep(0.1)
+            time.sleep(0.2)  # 检测间隔
         except Exception as e:
             print(f"邀请检测线程错误: {e}")
             time.sleep(1)
@@ -203,35 +187,35 @@ def invite_detection_thread():
     print("🎮 邀请检测线程结束")
     clear_invite_strip()
 
-# ========== 启动邀请检测 ==========
 def start_invite_detection():
-    """启动邀请检测后台线程"""
-    global invite_detection_active, game_started, invite_thread, FORCE_STOP_INVITE  # 🔧 新增
+    """启动邀请检测"""
+    global invite_detection_active, invite_thread, person_detected
     
-    # 🔧 新增：重置强制停止标志
-    FORCE_STOP_INVITE = False
+    if invite_detection_active:
+        return  # 已经在运行中
+    
+    print("🚀 启动邀请检测系统...")
     invite_detection_active = True
-    game_started = False
+    person_detected = False
     invite_thread = threading.Thread(target=invite_detection_thread, daemon=True)
     invite_thread.start()
-    print("🚀 邀请检测已启动")
+    print("✅ 邀请检测系统已启动")
 
-# ========== 停止邀请检测 ==========
 def stop_invite_detection():
     """停止邀请检测"""
-    global invite_detection_active, game_started, invite_thread, FORCE_STOP_INVITE  # 🔧 新增
+    global invite_detection_active, invite_thread, person_detected
     
-    print("🛑 正在停止邀请检测...")
+    if not invite_detection_active:
+        return  # 已经停止
     
-    # 🔧 修改：设置所有停止标志
+    print("🛑 正在停止邀请检测系统...")
     invite_detection_active = False
-    game_started = True
-    FORCE_STOP_INVITE = True  # 🔧 新增：强制停止！
+    person_detected = False
     
-    # 立即清空LED灯带，停止动画
+    # 立即清空LED灯带
     clear_invite_strip()
     
-    # 等待线程结束（最多等待1秒）
+    # 等待线程结束
     if invite_thread and invite_thread.is_alive():
         invite_thread.join(timeout=1.0)
         if invite_thread.is_alive():
@@ -239,9 +223,9 @@ def stop_invite_detection():
         else:
             print("✅ 邀请检测线程已成功停止")
     
-    print("⏹️ 邀请检测已停止")
+    print("⏹️ 邀请检测系统已停止")
 
-
+# ========== Flask应用配置 ==========
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'simon_game_secret'
 
@@ -249,7 +233,6 @@ app.config['SECRET_KEY'] = 'simon_game_secret'
 socketio = SocketIO(app, async_mode='threading', cors_allowed_origins="*")
 
 # 难度等级配置
-# level,light_duration_per_color,off_duration_between_colors
 level_duration_list = [
     (1, 1, 0.5),
     (2, 1, 0.49),
@@ -264,7 +247,6 @@ level_duration_list = [
     (11, 0.5, 0.40)
 ]
 
-# ------------------ 多人模式 -------------------------
 # 用户名存储
 user_sessions = {}
 # 房间状态管理
@@ -272,7 +254,7 @@ rooms = {}
 # 全局变量
 user_sids = {}  # { username: sid }
 
-# 连接事件处理
+# ========== Socket.IO事件处理 ==========
 @socketio.on('connect')
 def handle_connect():
     print("socket[connect]without data, Client connected", request.sid)
@@ -303,6 +285,9 @@ def handle_disconnect():
                         else:
                             del rooms[room]
                             print(f"已删除空房间: {room}")
+                            # 如果没有活跃房间了，重新启动邀请检测
+                            if not rooms:
+                                start_invite_detection()
                             break
                 socketio.emit('update_players', {
                     'players': rooms[room]['players'],
@@ -313,7 +298,7 @@ def handle_disconnect():
             user_sids.pop(username, None)
             break
 
-# 加入房间
+# 加入房间 - 关键修改点
 @socketio.on('join_room')
 def join_room(data):
     print("socket[join_room]with data:", data)
@@ -321,6 +306,9 @@ def join_room(data):
     room = data.get('room', 'default_room')
 
     print(f"{username} 加入 {room}")
+    
+    # 🔥 关键：有玩家加入房间时停止邀请检测
+    stop_invite_detection()
 
     if room in rooms and rooms[room]['game_active']:
         # 游戏已经开始，不允许加入
@@ -385,12 +373,7 @@ def handle_start_game(data):
             })
 
 def update_user_score(room, username, score_change):
-    """
-    更新指定用户的分数，并广播给房间所有人
-    :param room: 房间名
-    :param username: 用户名
-    :param score_change: 要增加的分数
-    """
+    """更新指定用户的分数，并广播给房间所有人"""
     if room in rooms and username in rooms[room]['players']:
         rooms[room]['players'][username]['score'] += score_change
         socketio.emit('update_score', {
@@ -462,8 +445,10 @@ def end_game(room):
     if room in rooms:
         del rooms[room]
     
-    # 重新启动邀请检测
-    start_invite_detection()
+    # 🔥 关键：游戏结束后，如果没有活跃房间，重新启动邀请检测
+    if not rooms:
+        print("🔄 所有游戏结束，重新启动邀请检测系统")
+        start_invite_detection()
 
 # 树莓派处理模拟
 def simulate_raspberry_processing_multi(room, level, sequence):
@@ -483,11 +468,9 @@ def simulate_raspberry_processing_multi(room, level, sequence):
         'sequence': sequence
     })
 
-# -------------------------- 主页 --------------------------
+# ========== 路由定义 ==========
 @app.route('/mode_selection')
 def mode_selection():
-    # 进入模式选择页面时重新启动邀请检测
-    start_invite_detection()
     return render_template('mode_selection.html')
 
 @app.route('/api/save_username', methods=['POST'])
@@ -508,20 +491,12 @@ def save_username():
 
 @app.route('/api/select_mode', methods=['POST'])
 def select_mode():
-    """选择游戏模式 - 立即停止邀请检测"""
-    global FORCE_STOP_INVITE  # 🔧 新增
-    
     data = request.json
     mode = data.get('mode')  # 'single' or 'multi'
     username = session.get('username', 'tourist')
 
     if not username or mode not in ['single', 'multi']:
         return jsonify({'error': 'Invalid input'}), 400
-
-    # 🔧 新增：简单粗暴，立即强制停止！
-    print(f"🎮 用户 {username} 选择了 {mode} 模式，强制停止邀请检测！")
-    FORCE_STOP_INVITE = True
-    stop_invite_detection()
 
     # 保存用户名和模式（可选）
     session['player_name'] = username
@@ -537,26 +512,25 @@ def select_mode():
 @app.route('/single')
 def single_player():
     username = session.get('username', 'tourist')
-    # 进入单人游戏页面时停止邀请检测
+    # 进入单人模式也停止邀请检测
     stop_invite_detection()
     return render_template('single.html', player_name=username, game_mode='single')
 
 @app.route('/multi')
 def multi_player():
     username = session.get('username', 'tourist')
-    # 进入多人游戏页面时停止邀请检测
+    # 进入多人模式也停止邀请检测
     stop_invite_detection()
     return render_template('multi.html', player_name=username, game_mode='multi')
 
 @app.route('/')
 def index():
-    # 返回主页时重新启动邀请检测
-    start_invite_detection()
+    # 访问主页时启动邀请检测
+    if not rooms:  # 只有在没有活跃房间时才启动
+        start_invite_detection()
     return render_template('mode_selection.html')
 
-# ---------------------------- 单人模式 ---------------------------------
-
-# 游戏状态管理
+# ========== 单人模式游戏逻辑 ==========
 class GameState:
     def __init__(self):
         self.current_level = 1
@@ -602,9 +576,6 @@ game_state = GameState()
 @app.route('/api/game/start', methods=['POST'])
 def start_game():
     """开始新游戏"""
-    # 确保邀请检测已停止
-    stop_invite_detection()
-    
     game_state.reset_game()
     game_state.game_active = True
     sequence = game_state.generate_sequence()
@@ -638,7 +609,7 @@ def check_sequence():
             'nextLevel': game_state.current_level
         })
     else:
-        # 游戏结束，重新启动邀请检测
+        # 🔥 关键：单人游戏结束后重新启动邀请检测
         start_invite_detection()
         return jsonify({
             'result': 'incorrect',
@@ -667,13 +638,12 @@ def get_sequence():
 def reset_game():
     """重置游戏状态"""
     game_state.reset_game()
-    # 重新启动邀请检测
+    # 🔥 关键：重置游戏后重新启动邀请检测
     start_invite_detection()
     return jsonify({'status': 'reset', 'score': 0, 'level': 1})
 
 # 树莓派处理模拟
 def simulate_raspberry_processing(level, sequence):
-
     # 播放序列
     led_controller.play_sequence(sequence, light_duration_per_color=level_duration_list[level-1][1], off_duration_between_colors=level_duration_list[level-1][2])
     print(f"树莓派序列处理完成: {sequence}")
@@ -691,9 +661,17 @@ def notify_frontend(message):
     print(f"已通过WebSocket发送通知到前端: {message}")
 
 if __name__ == '__main__':
-    # 启动邀请检测
-    start_invite_detection()
-    print("🎮 西蒙游戏服务器启动中...")
-    print("📡 邀请检测已激活，等待玩家靠近...")
+    print("🎮 Simon游戏服务器启动中...")
+    print("🎯 邀请检测系统已集成")
     
-    socketio.run(app, host='0.0.0.0', port=5000, allow_unsafe_werkzeug = True, debug = True)
+    # 🔥 关键：Flask启动时启动邀请检测
+    start_invite_detection()
+    
+    try:
+        socketio.run(app, host='0.0.0.0', port=5000, allow_unsafe_werkzeug=True, debug=True)
+    finally:
+        # 程序退出时清理资源
+        stop_invite_detection()
+        if IS_RPI_ENV:
+            GPIO.cleanup()
+        print("🧹 程序退出，资源已清理")
