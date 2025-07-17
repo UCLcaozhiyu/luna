@@ -92,7 +92,7 @@ def soft_breathing_once(step_delay=0.02):
     for b in range(0, 256, 4):  # 渐亮
         apply_brightness(color, b)
         time.sleep(step_delay)
-    time.sleep(0.3)
+    time.sleep(3)
     for b in range(255, -1, -4):  # 渐灭
         apply_brightness(color, b)
         time.sleep(step_delay)
