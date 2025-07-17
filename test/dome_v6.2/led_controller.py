@@ -87,13 +87,13 @@ def apply_brightness(base_color, brightness_scale):
         strip.setPixelColor(i, color)
     strip.show()
 
-def soft_breathing_once(step_delay=0.008):
+def soft_breathing_once(step_delay=0.02):
     color = random.choice(soft_colors)
-    for b in range(0, 256, 8):  # 渐亮
+    for b in range(0, 256, 4):  # 渐亮
         apply_brightness(color, b)
         time.sleep(step_delay)
-    time.sleep(0.1)
-    for b in range(255, -1, -8):  # 渐灭
+    time.sleep(0.3)
+    for b in range(255, -1, -4):  # 渐灭
         apply_brightness(color, b)
         time.sleep(step_delay)
 
@@ -113,8 +113,8 @@ def _soft_invite_loop():
         dist = get_distance()
         if dist and dist <= 100:
             clear_strip()
-            # 20秒暂停动画和检测
-            for _ in range(200):
+            # 60秒暂停动画和检测
+            for _ in range(600):
                 if _soft_invite_stop_event.is_set():
                     break
                 time.sleep(0.1)
