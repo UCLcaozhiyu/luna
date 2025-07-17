@@ -13,10 +13,10 @@ try:
     import RPi.GPIO as GPIO
     from rpi_ws281x import PixelStrip, Color
     IS_RPI = True
-    print(✅ 检测到树莓派环境，启用HC-SR04欢迎动画")
+    print(检测到树莓派环境，启用HC-SR04欢迎动画")
 except ImportError:
     IS_RPI = False
-    print(✅ 检测到开发环境，欢迎动画将使用模拟模式")
+    print(检测到开发环境，欢迎动画将使用模拟模式")
 
 # 硬件初始化
 if IS_RPI:
@@ -80,11 +80,11 @@ def wheel(pos):
 def play_welcome_animation():
   欢迎动画"
     if not IS_RPI:
-        print("🌈 模拟LED: 播放欢迎动画")
+        print("模拟LED: 播放欢迎动画")
         time.sleep(2)
         return
     
-    print(🌈 开始播放欢迎动画...)
+    print(开始播放欢迎动画...)
     
     # 彩虹渐变动画
     for j in range(256    if not welcome_active or led_locked:  # 检查是否需要停止
@@ -95,7 +95,7 @@ def play_welcome_animation():
         welcome_strip.show()
         time.sleep(0.2)
     
-    print(✅ 欢迎动画播放完成")
+    print(欢迎动画播放完成")
 
 def clear_welcome_led():
  空欢迎动画的LED灯带"
@@ -109,7 +109,7 @@ def clear_welcome_led():
 def welcome_detection_loop():
    测主循环"""
     global welcome_active
-    print(🎯 欢迎检测线程启动...")
+    print(欢迎检测线程启动...")
     trigger_distance =150 触发距离（单位 cm）
     
     while welcome_active and not led_locked:
@@ -120,13 +120,13 @@ def welcome_detection_loop():
             dist = get_distance()
             if dist is not None:
                 if IS_RPI:
-                    print(f🔍 当前距离：{dist} cm")
+                    print(f当前距离：{dist} cm")
                 
                 # 检测到人靠近
                 if dist <= trigger_distance:
-                    print(✅检测到人员靠近，播放欢迎动画！")
+                    print(检测到人员靠近，播放欢迎动画！")
                     play_welcome_animation()
-                    print("🎯 欢迎动画播放完成，等待人员离开...)              else:
+                    print("欢迎动画播放完成，等待人员离开...)              else:
                     # 人离开了，清空LED
                     clear_welcome_led()
 
@@ -145,11 +145,11 @@ def start_welcome_detection():
     if welcome_active:
         return  # 已经在运行中
     
-    print(🚀 启动欢迎检测系统...")
+    print(启动欢迎检测系统...")
     welcome_active = True
     welcome_thread = threading.Thread(target=welcome_detection_loop, daemon=True)
     welcome_thread.start()
-    print("✅ 欢迎检测系统已启动")
+    print("欢迎检测系统已启动")
 
 def stop_welcome_detection():
   欢迎检测"""
@@ -158,7 +158,7 @@ def stop_welcome_detection():
     if not welcome_active:
         return  # 已经停止
     
-    print("🛑 正在停止欢迎检测系统...")
+    print("正在停止欢迎检测系统...")
     welcome_active = False
     
     # 立即清空LED灯带
@@ -168,21 +168,21 @@ def stop_welcome_detection():
     if welcome_thread and welcome_thread.is_alive():
         welcome_thread.join(timeout=1.0)
         if welcome_thread.is_alive():
-            print(⚠️ 欢迎检测线程未能在1秒内停止，但已设置停止标志")
+            print(欢迎检测线程未能在1秒内停止，但已设置停止标志")
         else:
-            print("✅ 欢迎检测线程已成功停止")
+            print("欢迎检测线程已成功停止")
     
-    print("⏹️ 欢迎检测系统已停止")
+    print("欢迎检测系统已停止")
 
 def lock_led_for_game():
    游戏获取LED控制权 global led_locked
-    print("🎮 游戏获取LED控制权")
+    print("游戏获取LED控制权")
     led_locked = True
     clear_welcome_led()  # 清空欢迎动画
 
 def unlock_led_for_welcome():
    游戏释放LED控制权 global led_locked
-    print("🎯 游戏释放LED控制权，欢迎检测恢复")
+    print("游戏释放LED控制权，欢迎检测恢复")
     led_locked = False
 
 # ========== Flask应用配置 ==========
@@ -310,7 +310,7 @@ def handle_set_ready(data):
 def handle_start_game(data):
     print(socket[start_game]with data:", data)
     
-    # 🔥 关键：游戏开始时获取LED控制权
+    #  关键：游戏开始时获取LED控制权
     lock_led_for_game()
     
     # 延迟2s再开始
@@ -397,7 +397,7 @@ def end_game(room):
        scores': {u: p['score'] for u, p in room_data[players'].items()}
     })
 
-    # 🔥 关键：游戏结束后释放LED控制权
+    # 关键：游戏结束后释放LED控制权
     unlock_led_for_welcome()
 
     # 删除房间
@@ -426,7 +426,7 @@ def simulate_raspberry_processing_multi(room, level, sequence):
 # -------------------------- 主页 --------------------------
 @app.route('/mode_selection')
 def mode_selection():
-    # 🔥 关键：访问模式选择页时启动欢迎检测
+    # 关键：访问模式选择页时启动欢迎检测
     unlock_led_for_welcome()
     start_welcome_detection()
     return render_template('mode_selection.html)
@@ -466,13 +466,13 @@ def select_mode():
 
 @app.route('/single')
 def single_player():
-    # 🔥 关键：进入单人模式时停止欢迎检测
+    # 关键：进入单人模式时停止欢迎检测
     stop_welcome_detection()
     lock_led_for_game()
     username = session.get('username', 'tourist')
     return render_template('single.html', player_name=username, game_mode='single)@app.route('/multi')
 def multi_player():
-    # 🔥 关键：进入多人模式时停止欢迎检测
+    # 关键：进入多人模式时停止欢迎检测
     stop_welcome_detection()
     lock_led_for_game()
     username = session.get('username', 'tourist')
@@ -481,7 +481,7 @@ def multi_player():
 
 @app.route(/)
 def index():
-    # 🔥 关键：访问主页时启动欢迎检测
+    # 关键：访问主页时启动欢迎检测
     unlock_led_for_welcome()
     start_welcome_detection()
     return render_template('mode_selection.html')
@@ -614,10 +614,10 @@ def notify_frontend(message):
 
 
 if __name__ == '__main__':
-    print("🎮 西蒙游戏服务器启动中...")
-    print(🎯 HC-SR04动画系统已集成")
+    print("西蒙游戏服务器启动中...")
+    print(HC-SR04动画系统已集成")
     
-    # 🔥 关键：Flask启动时启动欢迎检测
+    # 关键：Flask启动时启动欢迎检测
     start_welcome_detection()
     
     try:
@@ -627,4 +627,4 @@ if __name__ == '__main__':
         stop_welcome_detection()
         if IS_RPI:
             GPIO.cleanup()
-        print("🧹 程序退出，资源已清理") 
+        print("程序退出，资源已清理") 
