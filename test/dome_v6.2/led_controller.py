@@ -111,10 +111,10 @@ _soft_invite_stop_event = threading.Event()
 def _soft_invite_loop():
     while not _soft_invite_stop_event.is_set():
         dist = get_distance()
-        if dist and dist <= 100:
+        if dist and dist <= 300:
             clear_strip()
             # 60秒暂停动画和检测
-            for _ in range(600):
+            for _ in range(12000):
                 if _soft_invite_stop_event.is_set():
                     break
                 time.sleep(0.1)
